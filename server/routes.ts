@@ -1,42 +1,49 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import OpenAI from "openai";
 import { GoogleGenAI } from "@google/genai";
 import ExcelJS from "exceljs";
 import sharp from "sharp";
+import path from "path";
+import fs from "fs";
 import { productDataSchema, type ProductData } from "@shared/schema";
-import { analyzeProductImages, type ExtractedProductData } from "./image-analyzer";
 
-const systemPrompt = `You are a Salla E-commerce Expert. Analyze the Back Image for barcode/specs and Front Image for appearance.
-Output strictly valid JSON with keys: product_name, seo_title, marketing_description, full_description, category, brand, sku_barcode, subtitle.
+const smartAnalysisPrompt = `أنت خبير في التجارة الإلكترونية ومحلل صور محترف. مهمتك تحليل صور المنتج واستخراج البيانات بدقة 100%.
 
-Rules:
-1. **Name:** [Brand] + [Model] + [Storage/RAM] + [Color].
-2. **SEO Title:** Max 50 chars, catchy.
-3. **Description:**
-   - Short Section (50-100 words).
-   - Long Section (Title, Short Desc, Detailed Features, Specs list, Box contents, Usage, Video URL).
-   - No Emojis, No markdown symbols like ###.
-4. **Data:**
-   - Extract Barcode from image.
-   - Verify specs (RAM/Storage) from text in the image.
-   - If text is blurry, infer from visual model identity.
+## قواعد صارمة:
+1. **ممنوع "غير معروف" أو "Unknown"** - يجب إيجاد كل البيانات
+2. **استخدم عدة أساليب للتحقق:**
+   - اقرأ النص من الصورة (OCR)
+   - حلل شكل الكرتون والعلبة
+   - ابحث عن الباركود/SKU في الصورة
+   - تعرف على الماركة من الشعار أو التصميم
+   - حلل الألوان والمواصفات المرئية
+   - إذا رأيت رقم موديل، ابحث عن مواصفاته
 
-Respond with JSON only, no markdown formatting or code blocks.`;
+## طريقة التحليل:
+1. **الصورة الخلفية**: ابحث عن الباركود، المواصفات، الملصقات
+2. **الصورة الأمامية**: تعرف على المنتج، الماركة، اللون، الموديل
+3. **تحقق مرتين**: راجع البيانات قبل الإخراج
 
-const enhancementPrompt = `You are a Salla E-commerce Expert. Enhance the following product data extracted via OCR analysis.
+## البيانات المطلوبة (JSON):
+{
+  "product_name": "[الماركة] [الموديل] [السعة/الذاكرة] [اللون]",
+  "seo_title": "عنوان SEO جذاب (50 حرف كحد أقصى)",
+  "marketing_description": "وصف تسويقي مختصر 50-100 كلمة",
+  "full_description": "وصف كامل يشمل: المواصفات، محتويات العلبة، الضمان",
+  "category": "التصنيف المناسب (مثال: هواتف ذكية)",
+  "brand": "اسم الماركة بالعربي",
+  "sku_barcode": "رقم الباركود من الصورة"
+}
 
-Current extracted data:
-{EXTRACTED_DATA}
+## ماركات معروفة:
+سامسونج، ابل، شاومي، هواوي، اوبو، فيفو، ريلمي، ون بلس، هونر، نوكيا، موتورولا، سوني، جوجل، انفينكس، تكنو، ريدمي، بوكو
 
-Based on the product images provided, please:
-1. Verify and correct any OCR errors in the extracted data
-2. Enhance the marketing_description to be more compelling (50-100 words, Arabic)
-3. Improve the full_description with better formatting and more details
-4. Confirm or correct the brand, category, and specs
+## تحذير:
+- إذا لم تجد الباركود في الصورة، اكتب رقم الموديل بدلاً منه
+- لا تترك أي حقل فارغ
+- لا تستخدم كلمة "غير معروف" أبداً
 
-Output strictly valid JSON with these keys: product_name, seo_title, marketing_description, full_description, category, brand, sku_barcode, subtitle.
-Keep Arabic text professional. No emojis.`;
+أجب بـ JSON فقط، بدون تنسيق markdown أو أي نص إضافي.`;
 
 export async function registerRoutes(
   httpServer: Server,
@@ -45,7 +52,7 @@ export async function registerRoutes(
 
   app.post("/api/generate", async (req, res) => {
     try {
-      const { frontImage, backImage, apiKey, provider = "gemini", useAI = true } = req.body;
+      const { frontImage, backImage } = req.body;
 
       if (!frontImage || !backImage) {
         return res.status(400).json({
@@ -75,236 +82,70 @@ export async function registerRoutes(
         processImage(backImage),
       ]);
 
-      const { analysis, productData: extractedData, stages } = await analyzeProductImages(frontBuffer, backBuffer);
-
-      let finalData: ProductData;
-
-      if (!useAI) {
-        finalData = {
-          product_name: extractedData.product_name,
-          seo_title: extractedData.seo_title,
-          marketing_description: extractedData.marketing_description,
-          full_description: extractedData.full_description,
-          category: extractedData.category,
-          brand: extractedData.brand,
-          sku_barcode: extractedData.sku_barcode,
-          subtitle: extractedData.subtitle,
-        };
-
-        return res.json({
-          success: true,
-          data: finalData,
-          analysis: {
-            barcode: analysis.barcode,
-            modelNumber: analysis.modelNumber,
-            brand: analysis.brand,
-            ram: analysis.ram,
-            storage: analysis.storage,
-            color: analysis.color,
-            confidence: analysis.confidence,
-          },
-          stages,
-          method: "ocr",
-        });
-      }
-
       const processedFrontBase64 = frontBuffer.toString("base64");
       const processedBackBase64 = backBuffer.toString("base64");
 
-      let content: string | null = null;
-      const prompt = enhancementPrompt.replace("{EXTRACTED_DATA}", JSON.stringify(extractedData, null, 2));
+      let geminiApiKey = process.env.AI_INTEGRATIONS_GEMINI_API_KEY;
+      let baseUrl = process.env.AI_INTEGRATIONS_GEMINI_BASE_URL;
+      let apiVersion = "";
 
-      if (provider === "gemini") {
-        let geminiApiKey = apiKey;
-        let baseUrl = undefined;
-        let apiVersion = "v1beta";
-
-        if (!geminiApiKey && process.env.AI_INTEGRATIONS_GEMINI_API_KEY) {
-          geminiApiKey = process.env.AI_INTEGRATIONS_GEMINI_API_KEY;
-          baseUrl = process.env.AI_INTEGRATIONS_GEMINI_BASE_URL;
-          apiVersion = "";
-        }
-
-        if (!geminiApiKey) {
-          finalData = extractedData as ProductData;
-          return res.json({
-            success: true,
-            data: finalData,
-            analysis: {
-              barcode: analysis.barcode,
-              modelNumber: analysis.modelNumber,
-              brand: analysis.brand,
-              ram: analysis.ram,
-              storage: analysis.storage,
-              color: analysis.color,
-              confidence: analysis.confidence,
-            },
-            stages: [...stages, "تحذير: لا يوجد مفتاح API للتحسين بالذكاء الاصطناعي"],
-            method: "ocr",
-          });
-        }
-
-        const ai = new GoogleGenAI({
-          apiKey: geminiApiKey,
-          httpOptions: baseUrl ? {
-            apiVersion,
-            baseUrl,
-          } : undefined,
+      if (!geminiApiKey) {
+        return res.status(400).json({
+          success: false,
+          error: "Gemini API key not configured",
         });
-
-        const response = await ai.models.generateContent({
-          model: "gemini-2.5-flash",
-          contents: [
-            {
-              role: "user",
-              parts: [
-                { text: prompt },
-                { text: "Here are the product images for verification. First is front, second is back:" },
-                { inlineData: { mimeType: "image/jpeg", data: processedFrontBase64 } },
-                { inlineData: { mimeType: "image/jpeg", data: processedBackBase64 } },
-              ],
-            },
-          ],
-        });
-
-        content = response.text || null;
-
-      } else if (provider === "openrouter") {
-        let openrouterApiKey = apiKey;
-        let baseUrl = "https://openrouter.ai/api/v1";
-
-        if (!openrouterApiKey && process.env.AI_INTEGRATIONS_OPENROUTER_API_KEY) {
-          openrouterApiKey = process.env.AI_INTEGRATIONS_OPENROUTER_API_KEY;
-          baseUrl = process.env.AI_INTEGRATIONS_OPENROUTER_BASE_URL || baseUrl;
-        }
-
-        if (!openrouterApiKey) {
-          finalData = extractedData as ProductData;
-          return res.json({
-            success: true,
-            data: finalData,
-            analysis: {
-              barcode: analysis.barcode,
-              modelNumber: analysis.modelNumber,
-              brand: analysis.brand,
-              ram: analysis.ram,
-              storage: analysis.storage,
-              color: analysis.color,
-              confidence: analysis.confidence,
-            },
-            stages: [...stages, "تحذير: لا يوجد مفتاح API للتحسين بالذكاء الاصطناعي"],
-            method: "ocr",
-          });
-        }
-
-        const openrouter = new OpenAI({
-          baseURL: baseUrl,
-          apiKey: openrouterApiKey,
-        });
-
-        const response = await openrouter.chat.completions.create({
-          model: "google/gemini-2.5-flash-preview",
-          messages: [
-            {
-              role: "user",
-              content: [
-                { type: "text", text: prompt },
-                { type: "text", text: "Here are the product images for verification. First is front, second is back:" },
-                { type: "image_url", image_url: { url: `data:image/jpeg;base64,${processedFrontBase64}` } },
-                { type: "image_url", image_url: { url: `data:image/jpeg;base64,${processedBackBase64}` } },
-              ],
-            },
-          ],
-          max_tokens: 2048,
-        });
-
-        content = response.choices[0].message.content;
-
-      } else {
-        if (!apiKey) {
-          finalData = extractedData as ProductData;
-          return res.json({
-            success: true,
-            data: finalData,
-            analysis: {
-              barcode: analysis.barcode,
-              modelNumber: analysis.modelNumber,
-              brand: analysis.brand,
-              ram: analysis.ram,
-              storage: analysis.storage,
-              color: analysis.color,
-              confidence: analysis.confidence,
-            },
-            stages: [...stages, "تحذير: لا يوجد مفتاح API للتحسين بالذكاء الاصطناعي - مطلوب لـ OpenAI"],
-            method: "ocr",
-          });
-        }
-
-        const openai = new OpenAI({ apiKey });
-
-        const response = await openai.chat.completions.create({
-          model: "gpt-4o",
-          messages: [
-            {
-              role: "user",
-              content: [
-                { type: "text", text: prompt },
-                { type: "text", text: "Here are the product images for verification. First is front, second is back:" },
-                { type: "image_url", image_url: { url: `data:image/jpeg;base64,${processedFrontBase64}` } },
-                { type: "image_url", image_url: { url: `data:image/jpeg;base64,${processedBackBase64}` } },
-              ],
-            },
-          ],
-          response_format: { type: "json_object" },
-          max_tokens: 2048,
-        });
-
-        content = response.choices[0].message.content;
       }
+
+      const ai = new GoogleGenAI({
+        apiKey: geminiApiKey,
+        httpOptions: baseUrl ? {
+          apiVersion,
+          baseUrl,
+        } : undefined,
+      });
+
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: [
+          {
+            role: "user",
+            parts: [
+              { text: smartAnalysisPrompt },
+              { text: "الصورة الأمامية للمنتج:" },
+              { inlineData: { mimeType: "image/jpeg", data: processedFrontBase64 } },
+              { text: "الصورة الخلفية للمنتج (الباركود والمواصفات):" },
+              { inlineData: { mimeType: "image/jpeg", data: processedBackBase64 } },
+            ],
+          },
+        ],
+      });
+
+      const content = response.text;
 
       if (!content) {
-        finalData = extractedData as ProductData;
-        return res.json({
-          success: true,
-          data: finalData,
-          analysis: {
-            barcode: analysis.barcode,
-            modelNumber: analysis.modelNumber,
-            brand: analysis.brand,
-            ram: analysis.ram,
-            storage: analysis.storage,
-            color: analysis.color,
-            confidence: analysis.confidence,
-          },
-          stages: [...stages, "لم يتم الحصول على رد من الذكاء الاصطناعي"],
-          method: "ocr",
+        return res.status(500).json({
+          success: false,
+          error: "No response from AI",
         });
       }
 
+      let productData: ProductData;
       try {
         const jsonContent = content.replace(/```json\n?|\n?```/g, "").trim();
-        finalData = productDataSchema.parse(JSON.parse(jsonContent));
-        stages.push("تم تحسين البيانات بالذكاء الاصطناعي بنجاح");
+        productData = productDataSchema.parse(JSON.parse(jsonContent));
       } catch (parseError) {
         console.error("Parse error:", parseError, "Content:", content);
-        finalData = extractedData as ProductData;
-        stages.push("فشل تحليل رد الذكاء الاصطناعي، تم استخدام بيانات OCR");
+        return res.status(500).json({
+          success: false,
+          error: "Failed to parse AI response",
+        });
       }
 
       return res.json({
         success: true,
-        data: finalData,
-        analysis: {
-          barcode: analysis.barcode,
-          modelNumber: analysis.modelNumber,
-          brand: analysis.brand,
-          ram: analysis.ram,
-          storage: analysis.storage,
-          color: analysis.color,
-          confidence: analysis.confidence,
-        },
-        stages,
-        method: "ai_enhanced",
+        data: productData,
+        frontImageBase64: processedFrontBase64,
+        backImageBase64: processedBackBase64,
       });
     } catch (error: any) {
       console.error("Generation error:", error);
@@ -317,7 +158,7 @@ export async function registerRoutes(
 
   app.post("/api/download-excel", async (req, res) => {
     try {
-      const { productData } = req.body;
+      const { productData, frontImageBase64 } = req.body;
 
       if (!productData) {
         return res.status(400).json({ error: "Product data is required" });
@@ -333,94 +174,128 @@ export async function registerRoutes(
 
       const validatedData = validationResult.data;
 
+      const templatePath = path.join(process.cwd(), "attached_assets", "Salla_Products_Template_1765491101794.xlsx");
+      
       const workbook = new ExcelJS.Workbook();
-      const worksheet = workbook.addWorksheet("Salla Products Template Sheet", {
-        views: [{ rightToLeft: true }],
-      });
+      
+      if (fs.existsSync(templatePath)) {
+        await workbook.xlsx.readFile(templatePath);
+        const worksheet = workbook.worksheets[0];
+        
+        if (worksheet) {
+          worksheet.spliceRows(1, 1);
+          
+          const newRowNumber = worksheet.rowCount + 1;
+          const newRow = worksheet.getRow(newRowNumber);
+          
+          newRow.getCell(1).value = "منتج";
+          newRow.getCell(2).value = validatedData.product_name;
+          newRow.getCell(3).value = validatedData.category;
+          newRow.getCell(4).value = "";
+          newRow.getCell(5).value = "";
+          newRow.getCell(6).value = "";
+          newRow.getCell(7).value = 0;
+          newRow.getCell(8).value = validatedData.full_description;
+          newRow.getCell(9).value = "نعم";
+          newRow.getCell(10).value = validatedData.sku_barcode;
+          newRow.getCell(11).value = 0;
+          newRow.getCell(12).value = "";
+          newRow.getCell(13).value = "";
+          newRow.getCell(14).value = "";
+          newRow.getCell(15).value = "";
+          newRow.getCell(16).value = "";
+          newRow.getCell(17).value = "";
+          newRow.getCell(18).value = 0.1;
+          newRow.getCell(19).value = "كيلوغرام";
+          newRow.getCell(20).value = validatedData.brand;
+          newRow.getCell(21).value = validatedData.seo_title;
+          newRow.getCell(22).value = "";
+          newRow.getCell(23).value = validatedData.sku_barcode;
+          newRow.getCell(24).value = "";
+          newRow.getCell(25).value = "";
+          newRow.getCell(26).value = "";
+          newRow.getCell(27).value = "تفعيل";
+          newRow.getCell(28).value = "";
+          
+          newRow.commit();
+        }
+      } else {
+        const worksheet = workbook.addWorksheet("Salla Products Template Sheet", {
+          views: [{ rightToLeft: true }],
+        });
 
-      const headerRow1 = [
-        "بيانات المنتج", "بيانات المنتج", "بيانات المنتج", "بيانات المنتج", "بيانات المنتج",
-        "بيانات المنتج", "بيانات المنتج", "بيانات المنتج", "بيانات المنتج", "بيانات المنتج",
-        "بيانات المنتج", "بيانات المنتج", "بيانات المنتج", "بيانات المنتج", "بيانات المنتج",
-        "بيانات المنتج", "بيانات المنتج", "بيانات المنتج", "بيانات المنتج",
-        "", "", "", "", "", "", "", "", "",
-      ];
+        const headers = [
+          "النوع",
+          "أسم المنتج",
+          "تصنيف المنتج",
+          "صورة المنتج",
+          "وصف صورة المنتج",
+          "نوع المنتج",
+          "سعر المنتج",
+          "الوصف",
+          "هل يتطلب شحن؟",
+          "رمز المنتج sku",
+          "سعر التكلفة",
+          "السعر المخفض",
+          "تاريخ بداية التخفيض",
+          "تاريخ نهاية التخفيض",
+          "اقصي كمية لكل عميل",
+          "إخفاء خيار تحديد الكمية",
+          "اضافة صورة عند الطلب",
+          "الوزن",
+          "وحدة الوزن",
+          "الماركة",
+          "العنوان الترويجي",
+          "تثبيت المنتج",
+          "الباركود",
+          "السعرات الحرارية",
+          "MPN",
+          "GTIN",
+          "خاضع للضريبة ؟",
+          "سبب عدم الخضوع للضريبة",
+        ];
 
-      const headers = [
-        "النوع",
-        "أسم المنتج",
-        "تصنيف المنتج",
-        "صورة المنتج",
-        "وصف صورة المنتج",
-        "نوع المنتج",
-        "سعر المنتج",
-        "الوصف",
-        "هل يتطلب شحن؟",
-        "رمز المنتج sku",
-        "سعر التكلفة",
-        "السعر المخفض",
-        "تاريخ بداية التخفيض",
-        "تاريخ نهاية التخفيض",
-        "اقصي كمية لكل عميل",
-        "إخفاء خيار تحديد الكمية",
-        "اضافة صورة عند الطلب",
-        "الوزن",
-        "وحدة الوزن",
-        "الماركة",
-        "العنوان الترويجي",
-        "تثبيت المنتج",
-        "الباركود",
-        "السعرات الحرارية",
-        "MPN",
-        "GTIN",
-        "خاضع للضريبة ؟",
-        "سبب عدم الخضوع للضريبة",
-      ];
+        worksheet.addRow(headers);
+        worksheet.getRow(1).font = { bold: true };
+        worksheet.getRow(1).alignment = { horizontal: "right" };
 
-      worksheet.addRow(headerRow1);
-      worksheet.addRow(headers);
+        const dataRow = [
+          "منتج",
+          validatedData.product_name || "",
+          validatedData.category || "",
+          "",
+          "",
+          "",
+          0,
+          validatedData.full_description || "",
+          "نعم",
+          validatedData.sku_barcode || "",
+          0,
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          0.1,
+          "كيلوغرام",
+          validatedData.brand || "",
+          validatedData.seo_title || "",
+          "",
+          validatedData.sku_barcode || "",
+          "",
+          "",
+          "",
+          "تفعيل",
+          "",
+        ];
 
-      worksheet.getRow(1).font = { bold: true };
-      worksheet.getRow(1).alignment = { horizontal: "right" };
-      worksheet.getRow(2).font = { bold: true };
-      worksheet.getRow(2).alignment = { horizontal: "right" };
+        worksheet.addRow(dataRow);
 
-      const dataRow = [
-        "منتج",
-        validatedData.product_name || "",
-        validatedData.category || "",
-        "",
-        "",
-        "",
-        0,
-        validatedData.full_description || "",
-        "نعم",
-        validatedData.sku_barcode || "",
-        0,
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        0.1,
-        "كيلوغرام",
-        validatedData.brand || "",
-        validatedData.subtitle || "",
-        "",
-        validatedData.sku_barcode || "",
-        "",
-        "",
-        "",
-        "تفعيل",
-        "",
-      ];
-
-      worksheet.addRow(dataRow);
-
-      worksheet.columns.forEach((column) => {
-        column.width = 20;
-      });
+        worksheet.columns.forEach((column) => {
+          column.width = 20;
+        });
+      }
 
       const filename = validatedData.sku_barcode 
         ? `salla-product-${validatedData.sku_barcode}.xlsx`

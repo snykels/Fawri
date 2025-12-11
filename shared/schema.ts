@@ -1,14 +1,13 @@
 import { z } from "zod";
 
 export const productDataSchema = z.object({
-  product_name: z.string(),
-  seo_title: z.string(),
-  marketing_description: z.string(),
-  full_description: z.string(),
-  category: z.string(),
-  brand: z.string(),
-  sku_barcode: z.string(),
-  subtitle: z.string(),
+  product_name: z.string().min(1, "اسم المنتج مطلوب"),
+  seo_title: z.string().min(1, "عنوان SEO مطلوب"),
+  marketing_description: z.string().min(1, "الوصف التسويقي مطلوب"),
+  full_description: z.string().min(1, "الوصف الكامل مطلوب"),
+  category: z.string().min(1, "التصنيف مطلوب"),
+  brand: z.string().min(1, "الماركة مطلوبة"),
+  sku_barcode: z.string().min(1, "الباركود مطلوب"),
 });
 
 export type ProductData = z.infer<typeof productDataSchema>;
