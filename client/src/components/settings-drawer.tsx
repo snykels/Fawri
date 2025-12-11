@@ -201,11 +201,16 @@ export function SettingsDrawer({
           )}
 
           {hasApiKey && (
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-green-500/10 border border-green-500/30">
-              <CheckCircle className="h-4 w-4 text-green-600" />
-              <span className="text-sm text-green-600 dark:text-green-400">
-                Using your API key
-              </span>
+            <div className="flex flex-col gap-1 p-3 rounded-lg bg-green-500/10 border border-green-500/30">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                <span className="text-sm text-green-600 dark:text-green-400">
+                  Using your API key
+                </span>
+              </div>
+              <p className="text-xs text-green-600 dark:text-green-400 font-arabic" dir="rtl">
+                يتم استخدام مفتاح API الخاص بك
+              </p>
             </div>
           )}
 
