@@ -13,9 +13,24 @@ export const productDataSchema = z.object({
 
 export type ProductData = z.infer<typeof productDataSchema>;
 
+export const analysisResultSchema = z.object({
+  barcode: z.string().nullable(),
+  modelNumber: z.string().nullable(),
+  brand: z.string().nullable(),
+  ram: z.string().nullable(),
+  storage: z.string().nullable(),
+  color: z.string().nullable(),
+  confidence: z.number(),
+});
+
+export type AnalysisResult = z.infer<typeof analysisResultSchema>;
+
 export const generateListingRequestSchema = z.object({
   frontImage: z.string(),
   backImage: z.string(),
+  apiKey: z.string().optional(),
+  provider: z.enum(["openai", "gemini", "openrouter"]).optional(),
+  useAI: z.boolean().optional(),
 });
 
 export type GenerateListingRequest = z.infer<typeof generateListingRequestSchema>;
@@ -23,6 +38,9 @@ export type GenerateListingRequest = z.infer<typeof generateListingRequestSchema
 export const generateListingResponseSchema = z.object({
   success: z.boolean(),
   data: productDataSchema.optional(),
+  analysis: analysisResultSchema.optional(),
+  stages: z.array(z.string()).optional(),
+  method: z.enum(["ocr", "ai_enhanced"]).optional(),
   error: z.string().optional(),
 });
 

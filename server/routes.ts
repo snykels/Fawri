@@ -5,6 +5,7 @@ import { GoogleGenAI } from "@google/genai";
 import ExcelJS from "exceljs";
 import sharp from "sharp";
 import { productDataSchema, type ProductData } from "@shared/schema";
+import { analyzeProductImages, type ExtractedProductData } from "./image-analyzer";
 
 const systemPrompt = `You are a Salla E-commerce Expert. Analyze the Back Image for barcode/specs and Front Image for appearance.
 Output strictly valid JSON with keys: product_name, seo_title, marketing_description, full_description, category, brand, sku_barcode, subtitle.
@@ -23,6 +24,20 @@ Rules:
 
 Respond with JSON only, no markdown formatting or code blocks.`;
 
+const enhancementPrompt = `You are a Salla E-commerce Expert. Enhance the following product data extracted via OCR analysis.
+
+Current extracted data:
+{EXTRACTED_DATA}
+
+Based on the product images provided, please:
+1. Verify and correct any OCR errors in the extracted data
+2. Enhance the marketing_description to be more compelling (50-100 words, Arabic)
+3. Improve the full_description with better formatting and more details
+4. Confirm or correct the brand, category, and specs
+
+Output strictly valid JSON with these keys: product_name, seo_title, marketing_description, full_description, category, brand, sku_barcode, subtitle.
+Keep Arabic text professional. No emojis.`;
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -30,7 +45,7 @@ export async function registerRoutes(
 
   app.post("/api/generate", async (req, res) => {
     try {
-      const { frontImage, backImage, apiKey, provider = "gemini" } = req.body;
+      const { frontImage, backImage, apiKey, provider = "gemini", useAI = true } = req.body;
 
       if (!frontImage || !backImage) {
         return res.status(400).json({
@@ -39,7 +54,7 @@ export async function registerRoutes(
         });
       }
 
-      const processImage = async (base64Image: string): Promise<string> => {
+      const processImage = async (base64Image: string): Promise<Buffer> => {
         const cleanBase64 = base64Image.replace(/^data:image\/\w+;base64,/, "");
         const imageBuffer = Buffer.from(cleanBase64, "base64");
 
@@ -52,15 +67,52 @@ export async function registerRoutes(
           .jpeg({ quality: 85 })
           .toBuffer();
 
-        return processed.toString("base64");
+        return processed;
       };
 
-      const [processedFront, processedBack] = await Promise.all([
+      const [frontBuffer, backBuffer] = await Promise.all([
         processImage(frontImage),
         processImage(backImage),
       ]);
 
+      const { analysis, productData: extractedData, stages } = await analyzeProductImages(frontBuffer, backBuffer);
+
+      let finalData: ProductData;
+
+      if (!useAI) {
+        finalData = {
+          product_name: extractedData.product_name,
+          seo_title: extractedData.seo_title,
+          marketing_description: extractedData.marketing_description,
+          full_description: extractedData.full_description,
+          category: extractedData.category,
+          brand: extractedData.brand,
+          sku_barcode: extractedData.sku_barcode,
+          subtitle: extractedData.subtitle,
+        };
+
+        return res.json({
+          success: true,
+          data: finalData,
+          analysis: {
+            barcode: analysis.barcode,
+            modelNumber: analysis.modelNumber,
+            brand: analysis.brand,
+            ram: analysis.ram,
+            storage: analysis.storage,
+            color: analysis.color,
+            confidence: analysis.confidence,
+          },
+          stages,
+          method: "ocr",
+        });
+      }
+
+      const processedFrontBase64 = frontBuffer.toString("base64");
+      const processedBackBase64 = backBuffer.toString("base64");
+
       let content: string | null = null;
+      const prompt = enhancementPrompt.replace("{EXTRACTED_DATA}", JSON.stringify(extractedData, null, 2));
 
       if (provider === "gemini") {
         let geminiApiKey = apiKey;
@@ -74,9 +126,21 @@ export async function registerRoutes(
         }
 
         if (!geminiApiKey) {
-          return res.status(400).json({
-            success: false,
-            error: "Gemini API key is required. Please add your key in Settings or use built-in credits.",
+          finalData = extractedData as ProductData;
+          return res.json({
+            success: true,
+            data: finalData,
+            analysis: {
+              barcode: analysis.barcode,
+              modelNumber: analysis.modelNumber,
+              brand: analysis.brand,
+              ram: analysis.ram,
+              storage: analysis.storage,
+              color: analysis.color,
+              confidence: analysis.confidence,
+            },
+            stages: [...stages, "تحذير: لا يوجد مفتاح API للتحسين بالذكاء الاصطناعي"],
+            method: "ocr",
           });
         }
 
@@ -94,10 +158,10 @@ export async function registerRoutes(
             {
               role: "user",
               parts: [
-                { text: systemPrompt },
-                { text: "Analyze these product images and generate a complete Salla e-commerce listing. The first image is the front product shot, and the second is the back with specs and barcode." },
-                { inlineData: { mimeType: "image/jpeg", data: processedFront } },
-                { inlineData: { mimeType: "image/jpeg", data: processedBack } },
+                { text: prompt },
+                { text: "Here are the product images for verification. First is front, second is back:" },
+                { inlineData: { mimeType: "image/jpeg", data: processedFrontBase64 } },
+                { inlineData: { mimeType: "image/jpeg", data: processedBackBase64 } },
               ],
             },
           ],
@@ -115,9 +179,21 @@ export async function registerRoutes(
         }
 
         if (!openrouterApiKey) {
-          return res.status(400).json({
-            success: false,
-            error: "OpenRouter API key is required. Please add your key in Settings or use built-in credits.",
+          finalData = extractedData as ProductData;
+          return res.json({
+            success: true,
+            data: finalData,
+            analysis: {
+              barcode: analysis.barcode,
+              modelNumber: analysis.modelNumber,
+              brand: analysis.brand,
+              ram: analysis.ram,
+              storage: analysis.storage,
+              color: analysis.color,
+              confidence: analysis.confidence,
+            },
+            stages: [...stages, "تحذير: لا يوجد مفتاح API للتحسين بالذكاء الاصطناعي"],
+            method: "ocr",
           });
         }
 
@@ -130,28 +206,12 @@ export async function registerRoutes(
           model: "google/gemini-2.5-flash-preview",
           messages: [
             {
-              role: "system",
-              content: systemPrompt,
-            },
-            {
               role: "user",
               content: [
-                {
-                  type: "text",
-                  text: "Analyze these product images and generate a complete Salla e-commerce listing. The first image is the front product shot, and the second is the back with specs and barcode.",
-                },
-                {
-                  type: "image_url",
-                  image_url: {
-                    url: `data:image/jpeg;base64,${processedFront}`,
-                  },
-                },
-                {
-                  type: "image_url",
-                  image_url: {
-                    url: `data:image/jpeg;base64,${processedBack}`,
-                  },
-                },
+                { type: "text", text: prompt },
+                { type: "text", text: "Here are the product images for verification. First is front, second is back:" },
+                { type: "image_url", image_url: { url: `data:image/jpeg;base64,${processedFrontBase64}` } },
+                { type: "image_url", image_url: { url: `data:image/jpeg;base64,${processedBackBase64}` } },
               ],
             },
           ],
@@ -162,9 +222,21 @@ export async function registerRoutes(
 
       } else {
         if (!apiKey) {
-          return res.status(400).json({
-            success: false,
-            error: "OpenAI API key is required. Please add your key in Settings.",
+          finalData = extractedData as ProductData;
+          return res.json({
+            success: true,
+            data: finalData,
+            analysis: {
+              barcode: analysis.barcode,
+              modelNumber: analysis.modelNumber,
+              brand: analysis.brand,
+              ram: analysis.ram,
+              storage: analysis.storage,
+              color: analysis.color,
+              confidence: analysis.confidence,
+            },
+            stages: [...stages, "تحذير: لا يوجد مفتاح API للتحسين بالذكاء الاصطناعي - مطلوب لـ OpenAI"],
+            method: "ocr",
           });
         }
 
@@ -174,28 +246,12 @@ export async function registerRoutes(
           model: "gpt-4o",
           messages: [
             {
-              role: "system",
-              content: systemPrompt,
-            },
-            {
               role: "user",
               content: [
-                {
-                  type: "text",
-                  text: "Analyze these product images and generate a complete Salla e-commerce listing. The first image is the front product shot, and the second is the back with specs and barcode.",
-                },
-                {
-                  type: "image_url",
-                  image_url: {
-                    url: `data:image/jpeg;base64,${processedFront}`,
-                  },
-                },
-                {
-                  type: "image_url",
-                  image_url: {
-                    url: `data:image/jpeg;base64,${processedBack}`,
-                  },
-                },
+                { type: "text", text: prompt },
+                { type: "text", text: "Here are the product images for verification. First is front, second is back:" },
+                { type: "image_url", image_url: { url: `data:image/jpeg;base64,${processedFrontBase64}` } },
+                { type: "image_url", image_url: { url: `data:image/jpeg;base64,${processedBackBase64}` } },
               ],
             },
           ],
@@ -207,27 +263,48 @@ export async function registerRoutes(
       }
 
       if (!content) {
-        return res.status(500).json({
-          success: false,
-          error: "No response from AI",
+        finalData = extractedData as ProductData;
+        return res.json({
+          success: true,
+          data: finalData,
+          analysis: {
+            barcode: analysis.barcode,
+            modelNumber: analysis.modelNumber,
+            brand: analysis.brand,
+            ram: analysis.ram,
+            storage: analysis.storage,
+            color: analysis.color,
+            confidence: analysis.confidence,
+          },
+          stages: [...stages, "لم يتم الحصول على رد من الذكاء الاصطناعي"],
+          method: "ocr",
         });
       }
 
-      let parsedData: ProductData;
       try {
         const jsonContent = content.replace(/```json\n?|\n?```/g, "").trim();
-        parsedData = productDataSchema.parse(JSON.parse(jsonContent));
+        finalData = productDataSchema.parse(JSON.parse(jsonContent));
+        stages.push("تم تحسين البيانات بالذكاء الاصطناعي بنجاح");
       } catch (parseError) {
         console.error("Parse error:", parseError, "Content:", content);
-        return res.status(500).json({
-          success: false,
-          error: "Failed to parse AI response. Please try again.",
-        });
+        finalData = extractedData as ProductData;
+        stages.push("فشل تحليل رد الذكاء الاصطناعي، تم استخدام بيانات OCR");
       }
 
       return res.json({
         success: true,
-        data: parsedData,
+        data: finalData,
+        analysis: {
+          barcode: analysis.barcode,
+          modelNumber: analysis.modelNumber,
+          brand: analysis.brand,
+          ram: analysis.ram,
+          storage: analysis.storage,
+          color: analysis.color,
+          confidence: analysis.confidence,
+        },
+        stages,
+        method: "ai_enhanced",
       });
     } catch (error: any) {
       console.error("Generation error:", error);
