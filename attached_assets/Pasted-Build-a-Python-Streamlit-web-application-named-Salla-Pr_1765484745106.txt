@@ -1,0 +1,76 @@
+Build a Python Streamlit web application named "Salla Product Lister AI". This tool automates creating product listings for the "Salla" e-commerce platform by analyzing product images.
+
+### Tech Stack:
+- Python 3.10+
+- Streamlit (for UI)
+- Pandas & OpenPyXL (for Excel handling)
+- Pillow (PIL) (for image processing)
+- OpenAI API (library `openai`)
+
+### Core Features & Workflow:
+
+1. **Sidebar Configuration:**
+   - Input field for "OpenAI API Key".
+   - File Uploader for "Categories & Brands CSV" (Optional).
+
+2. **Main Interface - Image Upload:**
+   - Allow user to upload two images:
+     - `Front Image` (Product shot).
+     - `Back Image` (Specs, Barcode, Label).
+
+3. **Image Pre-processing Function (Crucial):**
+   - Create a function to process images before sending to AI.
+   - If an image is not square, resize it to fit within a 1000x1000 canvas.
+   - Fill the background with WHITE color (#FFFFFF) to ensure no transparency or empty space remains.
+   - Convert processed images to Base64 to send to OpenAI.
+
+4. **AI Analysis (GPT-4o Integration):**
+   - When the user clicks "Generate Listing", call `gpt-4o`.
+   - Send both Base64 images.
+   - **System Prompt:** Use the exact following instruction block for the AI:
+     """
+     You are a Salla E-commerce Expert. Analyze the Back Image for barcode/specs and Front Image for appearance.
+     Output strictly valid JSON with keys: product_name, seo_title, marketing_description, full_description, category, brand, sku_barcode, subtitle.
+     
+     Rules:
+     1. **Name:** [Brand] + [Model] + [Storage/RAM] + [Color].
+     2. **SEO Title:** Max 50 chars, catchy.
+     3. **Description:**
+        - Short Section (50-100 words).
+        - Long Section (Title, Short Desc, Detailed Features, Specs list, Box contents, Usage, Video URL).
+        - No Emojis, No markdown symbols like ###.
+     4. **Data:**
+        - Extract Barcode from image.
+        - Verify specs (RAM/Storage) from text in the image.
+        - If text is blurry, infer from visual model identity.
+     """
+
+5. **Data Formatting (Salla Excel Standard):**
+   - Create a Pandas DataFrame that matches the specific "Salla" import template headers exactly.
+   - **Map the AI JSON output to these specific Arabic Headers:**
+     - 'النوع' = 'منتج'
+     - 'أسم المنتج' = json['product_name']
+     - 'تصنيف المنتج' = json['category']
+     - 'الماركة' = json['brand']
+     - 'الوصف' = json['full_description']
+     - 'العنوان الترويجي' = json['subtitle']
+     - 'رمز المنتج sku' = json['sku_barcode']
+     - 'الباركود' = json['sku_barcode']
+     - 'عنوان صفحة المنتج (Page Title)' = json['seo_title']
+     - 'وصف تسويقي مختصر' = json['marketing_description']
+   - **Hardcoded Columns (Set these values):**
+     - 'هل يتطلب شحن؟' = 'نعم'
+     - 'السعر' = 0
+     - 'سعر التكلفة' = 0
+     - 'الكمية' = 0
+     - 'الوزن' = 0.1
+     - 'خاضع للضريبة ؟' = 'تفعيل'
+
+6. **Output:**
+   - Display the generated Product Name and SKU on screen for verification.
+   - Provide a "Download Excel" button to download the result as `.xlsx`.
+
+### Important Notes:
+- Handle JSON parsing errors gracefully.
+- Ensure the UI is clean and supports Arabic text display (RTL).
+- Use `st.columns` to show the uploaded images side-by-side.
