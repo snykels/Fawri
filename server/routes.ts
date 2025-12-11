@@ -46,12 +46,13 @@ const smartAnalysisPrompt = `**أنت خبير مزدوج:**
 
 {
   "product_name": "[الماركة] [السلسلة] [الموديل] [السعة/الذاكرة] [اللون] - اسم محسن للمتجر",
-  "seo_title": "عنوان SEO محسن لـ Google Shopping (50 حرف كحد أقصى)",
+  "seo_title": "",
   "marketing_description": "وصف تسويقي احترافي 50-100 كلمة مع كلمات مفتاحية رئيسية",
   "full_description": "وصف شامل: المواصفات التقنية، محتويات العلبة، الضمان، مع Long-tail Keywords",
   "category": "التصنيف المناسب (مثال: هواتف ذكية، سماعات، أجهزة منزلية)",
   "brand": "اسم الماركة بالعربي",
-  "sku_barcode": "الباركود الدولي (GTIN/EAN/UPC 12-13 رقم) أو رقم الموديل (MPN)"
+  "sku_barcode": "الباركود الدولي (GTIN/EAN/UPC 12-13 رقم) أو رقم الموديل (MPN)",
+  "product_image_url": "رابط صورة المنتج الرسمية من موقع الشركة أو متجر معروف (PNG/JPG، خلفية بيضاء، بدون علامات مائية)"
 }
 
 ---
@@ -223,7 +224,7 @@ export async function registerRoutes(
           setCellValue(1, "منتج");
           setCellValue(2, validatedData.product_name);
           setCellValue(3, validatedData.category);
-          setCellValue(4, "");
+          setCellValue(4, validatedData.product_image_url || "");
           setCellValue(5, "");
           setCellValue(6, "");
           setCellValue(7, 0);
@@ -240,13 +241,13 @@ export async function registerRoutes(
           setCellValue(18, 0.1);
           setCellValue(19, "كيلوغرام");
           setCellValue(20, validatedData.brand);
-          setCellValue(21, validatedData.seo_title);
+          setCellValue(21, "");
           setCellValue(22, "");
           setCellValue(23, validatedData.sku_barcode);
           setCellValue(24, "");
           setCellValue(25, "");
           setCellValue(26, "");
-          setCellValue(27, "تفعيل");
+          setCellValue(27, "نعم");
           setCellValue(28, "");
           
           newRow.commit();
@@ -295,7 +296,7 @@ export async function registerRoutes(
           "منتج",
           validatedData.product_name || "",
           validatedData.category || "",
-          "",
+          validatedData.product_image_url || "",
           "",
           "",
           0,
@@ -312,13 +313,13 @@ export async function registerRoutes(
           0.1,
           "كيلوغرام",
           validatedData.brand || "",
-          validatedData.seo_title || "",
+          "",
           "",
           validatedData.sku_barcode || "",
           "",
           "",
           "",
-          "تفعيل",
+          "نعم",
           "",
         ];
 

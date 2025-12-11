@@ -17,6 +17,9 @@ import {
   Barcode,
   FileText,
   Package,
+  Copy,
+  Check,
+  ExternalLink,
 } from "lucide-react";
 import type { ProductData } from "@shared/schema";
 
@@ -33,7 +36,20 @@ export default function Home() {
   const [backImage, setBackImage] = useState<File | null>(null);
   const [productData, setProductData] = useState<ProductData | null>(null);
   const [frontImageBase64, setFrontImageBase64] = useState<string>("");
+  const [copiedUrl, setCopiedUrl] = useState(false);
   const { toast } = useToast();
+
+  const handleCopyImageUrl = async () => {
+    if (productData?.product_image_url) {
+      await navigator.clipboard.writeText(productData.product_image_url);
+      setCopiedUrl(true);
+      toast({
+        title: "تم النسخ",
+        description: "تم نسخ رابط الصورة",
+      });
+      setTimeout(() => setCopiedUrl(false), 2000);
+    }
+  };
 
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -140,6 +156,7 @@ export default function Home() {
     setFrontImage(null);
     setBackImage(null);
     setFrontImageBase64("");
+    setCopiedUrl(false);
   };
 
   const canGenerate = frontImage && backImage;
@@ -236,18 +253,59 @@ export default function Home() {
               <Card className="overflow-visible">
                 <div className="p-6">
                   <div className="flex flex-col lg:flex-row gap-6">
-                    {frontImageBase64 && (
-                      <div className="flex-shrink-0">
-                        <div className="w-full lg:w-64 aspect-square rounded-lg bg-white border overflow-hidden">
+                    <div className="flex-shrink-0">
+                      <div className="w-full lg:w-64 aspect-square rounded-lg bg-white border overflow-hidden relative group">
+                        {productData.product_image_url ? (
+                          <img
+                            src={productData.product_image_url}
+                            alt={productData.product_name}
+                            className="w-full h-full object-contain"
+                            data-testid="img-product"
+                            onError={(e) => {
+                              if (frontImageBase64) {
+                                e.currentTarget.src = `data:image/jpeg;base64,${frontImageBase64}`;
+                              }
+                            }}
+                          />
+                        ) : frontImageBase64 ? (
                           <img
                             src={`data:image/jpeg;base64,${frontImageBase64}`}
                             alt={productData.product_name}
                             className="w-full h-full object-contain"
                             data-testid="img-product"
                           />
-                        </div>
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-muted">
+                            <Package className="h-12 w-12 text-muted-foreground" />
+                          </div>
+                        )}
+                        {productData.product_image_url && (
+                          <div className="absolute bottom-0 left-0 right-0 p-2 bg-background/90 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="flex gap-1">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="flex-1 text-xs gap-1"
+                                onClick={handleCopyImageUrl}
+                                data-testid="button-copy-image-url"
+                              >
+                                {copiedUrl ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                                {copiedUrl ? "تم النسخ" : "نسخ الرابط"}
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                className="h-8 w-8"
+                                onClick={() => window.open(productData.product_image_url, "_blank")}
+                                data-testid="button-open-image"
+                              >
+                                <ExternalLink className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    )}
+                    </div>
                     
                     <div className="flex-1 space-y-4" dir="rtl">
                       <div className="flex items-start justify-between gap-4 flex-wrap">
