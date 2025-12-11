@@ -2,18 +2,21 @@ import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Header } from "@/components/header";
 import { ImageUploadCard } from "@/components/image-upload-card";
-import { ProductPreview } from "@/components/product-preview";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import {
   Loader2,
   Download,
   Upload,
-  CheckCircle2,
   ScanBarcode,
+  RefreshCw,
+  Tag,
+  Barcode,
+  FileText,
+  Package,
 } from "lucide-react";
 import type { ProductData } from "@shared/schema";
 
@@ -132,6 +135,13 @@ export default function Home() {
     },
   });
 
+  const handleReset = () => {
+    setProductData(null);
+    setFrontImage(null);
+    setBackImage(null);
+    setFrontImageBase64("");
+  };
+
   const canGenerate = frontImage && backImage;
 
   return (
@@ -149,103 +159,171 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="grid gap-6 lg:grid-cols-2">
-            <ImageUploadCard
-              label="Front Image"
-              labelAr="الصورة الأمامية"
-              sublabel="Product shot showing the item clearly"
-              sublabelAr="صورة المنتج بشكل واضح"
-              image={frontImage}
-              onImageChange={setFrontImage}
-              testId="input-front-image"
-            />
-            <ImageUploadCard
-              label="Back Image"
-              labelAr="الصورة الخلفية"
-              sublabel="Specs, barcode, and label information"
-              sublabelAr="المواصفات والباركود والملصق"
-              image={backImage}
-              onImageChange={setBackImage}
-              testId="input-back-image"
-            />
-          </div>
-
-          <div className="flex justify-center">
-            <Button
-              size="lg"
-              className="px-8 py-6 text-lg gap-2"
-              disabled={!canGenerate || generateMutation.isPending}
-              onClick={() => generateMutation.mutate()}
-              data-testid="button-generate"
-            >
-              {generateMutation.isPending ? (
-                <>
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                  جاري التحليل...
-                </>
-              ) : (
-                <>
-                  <ScanBarcode className="h-5 w-5" />
-                  تحليل وإنشاء القائمة
-                </>
-              )}
-            </Button>
-          </div>
-
-          {productData && !generateMutation.isPending && (
-            <div className="space-y-6">
-              <Alert className="border-green-500/50 bg-green-500/10">
-                <CheckCircle2 className="h-4 w-4 text-green-600" />
-                <AlertTitle className="text-green-600 font-arabic" dir="rtl">
-                  تم إنشاء القائمة بنجاح
-                </AlertTitle>
-                <AlertDescription className="font-arabic" dir="rtl">
-                  تم تحليل الصور واستخراج جميع البيانات بالذكاء الاصطناعي
-                </AlertDescription>
-              </Alert>
-
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg font-arabic" dir="rtl">
-                    بيانات المنتج
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4" dir="rtl">
-                    <div className="p-3 rounded-lg bg-muted/50">
-                      <p className="text-xs text-muted-foreground">اسم المنتج</p>
-                      <p className="text-sm font-medium font-arabic">{productData.product_name}</p>
-                    </div>
-                    <div className="p-3 rounded-lg bg-muted/50">
-                      <p className="text-xs text-muted-foreground">الماركة</p>
-                      <p className="text-sm font-medium font-arabic">{productData.brand}</p>
-                    </div>
-                    <div className="p-3 rounded-lg bg-muted/50">
-                      <p className="text-xs text-muted-foreground">التصنيف</p>
-                      <p className="text-sm font-medium font-arabic">{productData.category}</p>
-                    </div>
-                    <div className="p-3 rounded-lg bg-muted/50">
-                      <p className="text-xs text-muted-foreground">الباركود/SKU</p>
-                      <p className="font-mono text-sm font-medium">{productData.sku_barcode}</p>
-                    </div>
-                    <div className="p-3 rounded-lg bg-muted/50 md:col-span-2">
-                      <p className="text-xs text-muted-foreground">عنوان SEO</p>
-                      <p className="text-sm font-medium font-arabic">{productData.seo_title}</p>
-                    </div>
-                    <div className="p-3 rounded-lg bg-muted/50 md:col-span-2">
-                      <p className="text-xs text-muted-foreground">الوصف التسويقي</p>
-                      <p className="text-sm font-medium font-arabic">{productData.marketing_description}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <ProductPreview data={productData} />
+          {!productData && !generateMutation.isPending && (
+            <>
+              <div className="grid gap-6 lg:grid-cols-2">
+                <ImageUploadCard
+                  label="Front Image"
+                  labelAr="الصورة الأمامية"
+                  sublabel="Product shot showing the item clearly"
+                  sublabelAr="صورة المنتج بشكل واضح"
+                  image={frontImage}
+                  onImageChange={setFrontImage}
+                  testId="input-front-image"
+                />
+                <ImageUploadCard
+                  label="Back Image"
+                  labelAr="الصورة الخلفية"
+                  sublabel="Specs, barcode, and label information"
+                  sublabelAr="المواصفات والباركود والملصق"
+                  image={backImage}
+                  onImageChange={setBackImage}
+                  testId="input-back-image"
+                />
+              </div>
 
               <div className="flex justify-center">
                 <Button
                   size="lg"
-                  variant="secondary"
+                  className="px-8 py-6 text-lg gap-2"
+                  disabled={!canGenerate}
+                  onClick={() => generateMutation.mutate()}
+                  data-testid="button-generate"
+                >
+                  <ScanBarcode className="h-5 w-5" />
+                  تحليل وإنشاء القائمة
+                </Button>
+              </div>
+
+              <Card className="p-12">
+                <div className="flex flex-col items-center justify-center text-center space-y-4">
+                  <div className="p-4 rounded-full bg-muted">
+                    <Upload className="h-8 w-8 text-muted-foreground" />
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="text-lg font-medium font-arabic" dir="rtl">
+                      جاهز لتحليل صور المنتج
+                    </h3>
+                    <p className="text-sm text-muted-foreground max-w-md font-arabic" dir="rtl">
+                      ارفع صورة المنتج الأمامية والخلفية لاستخراج البيانات تلقائياً
+                    </p>
+                  </div>
+                </div>
+              </Card>
+            </>
+          )}
+
+          {generateMutation.isPending && (
+            <Card className="p-12">
+              <div className="flex flex-col items-center justify-center text-center space-y-4">
+                <div className="p-4 rounded-full bg-primary/10">
+                  <Loader2 className="h-8 w-8 text-primary animate-spin" />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-lg font-medium font-arabic" dir="rtl">
+                    جاري تحليل المنتج...
+                  </h3>
+                  <p className="text-sm text-muted-foreground max-w-md font-arabic" dir="rtl">
+                    يتم استخراج البيانات باستخدام الذكاء الاصطناعي
+                  </p>
+                </div>
+              </div>
+            </Card>
+          )}
+
+          {productData && !generateMutation.isPending && (
+            <div className="space-y-6">
+              <Card className="overflow-visible">
+                <div className="p-6">
+                  <div className="flex flex-col lg:flex-row gap-6">
+                    {frontImageBase64 && (
+                      <div className="flex-shrink-0">
+                        <div className="w-full lg:w-64 aspect-square rounded-lg bg-white border overflow-hidden">
+                          <img
+                            src={`data:image/jpeg;base64,${frontImageBase64}`}
+                            alt={productData.product_name}
+                            className="w-full h-full object-contain"
+                            data-testid="img-product"
+                          />
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div className="flex-1 space-y-4" dir="rtl">
+                      <div className="flex items-start justify-between gap-4 flex-wrap">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge variant="secondary" className="text-xs">
+                              {productData.brand}
+                            </Badge>
+                            <Badge variant="outline" className="text-xs">
+                              {productData.category}
+                            </Badge>
+                          </div>
+                          <h3 className="text-xl font-bold font-arabic" data-testid="text-product-name">
+                            {productData.product_name}
+                          </h3>
+                        </div>
+                      </div>
+
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
+                          <Barcode className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                          <div className="min-w-0">
+                            <p className="text-xs text-muted-foreground">الباركود/SKU</p>
+                            <p className="font-mono text-sm font-medium truncate" data-testid="text-sku">
+                              {productData.sku_barcode}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
+                          <Tag className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                          <div className="min-w-0">
+                            <p className="text-xs text-muted-foreground">عنوان SEO</p>
+                            <p className="text-sm font-medium truncate font-arabic">
+                              {productData.seo_title}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2 p-3 rounded-lg bg-muted/50">
+                        <div className="flex items-center gap-2">
+                          <FileText className="h-4 w-4 text-muted-foreground" />
+                          <p className="text-xs text-muted-foreground">الوصف التسويقي</p>
+                        </div>
+                        <p className="text-sm font-arabic leading-relaxed">
+                          {productData.marketing_description}
+                        </p>
+                      </div>
+
+                      <div className="space-y-2 p-3 rounded-lg bg-muted/50">
+                        <div className="flex items-center gap-2">
+                          <Package className="h-4 w-4 text-muted-foreground" />
+                          <p className="text-xs text-muted-foreground">الوصف الكامل</p>
+                        </div>
+                        <p className="text-sm font-arabic leading-relaxed">
+                          {productData.full_description}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+
+              <div className="flex justify-center gap-4 flex-wrap">
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="px-6 py-6 text-lg gap-2"
+                  onClick={handleReset}
+                  data-testid="button-reset"
+                >
+                  <RefreshCw className="h-5 w-5" />
+                  رفع منتج آخر
+                </Button>
+                <Button
+                  size="lg"
                   className="px-8 py-6 text-lg gap-2"
                   disabled={downloadMutation.isPending}
                   onClick={() => downloadMutation.mutate()}
@@ -265,24 +343,6 @@ export default function Home() {
                 </Button>
               </div>
             </div>
-          )}
-
-          {!productData && !generateMutation.isPending && (
-            <Card className="p-12">
-              <div className="flex flex-col items-center justify-center text-center space-y-4">
-                <div className="p-4 rounded-full bg-muted">
-                  <Upload className="h-8 w-8 text-muted-foreground" />
-                </div>
-                <div className="space-y-2">
-                  <h3 className="text-lg font-medium font-arabic" dir="rtl">
-                    جاهز لتحليل صور المنتج
-                  </h3>
-                  <p className="text-sm text-muted-foreground max-w-md font-arabic" dir="rtl">
-                    ارفع صورة المنتج الأمامية والخلفية لاستخراج البيانات تلقائياً
-                  </p>
-                </div>
-              </div>
-            </Card>
           )}
         </div>
       </main>

@@ -7,67 +7,64 @@ import path from "path";
 import fs from "fs";
 import { productDataSchema, type ProductData } from "@shared/schema";
 
-const smartAnalysisPrompt = `**أنت وكيل استخبارات المنتجات (Product Intelligence Agent) ومتخصص في البحث العكسي (OSINT).**
+const smartAnalysisPrompt = `**أنت خبير مزدوج:**
+1. **وكيل استخبارات المنتجات (Product Intelligence Agent)** - متخصص في البحث العكسي (OSINT)
+2. **خبير SEO للتجارة الإلكترونية (Technical eCommerce SEO Specialist)** - محلل بيانات منتجات
 
-مهمتك: تحليل صور المنتج واستخراج بياناته الكاملة باتباع منهجية البحث الاستخباراتي المتسلسل.
+مهمتك: تحليل صور المنتج واستخراج "البصمة الرقمية الكاملة" باتباع منهجية البحث الاستخباراتي المتسلسل.
 
 ---
 
-## 🔍 خطوات العمل (The Workflow):
+## 🔍 المرحلة الأولى: التدقيق البصري واستخراج الكلمات المفتاحية
 
-### الخطوة 1: التحليل البصري واستخراج النص (Visual Analysis & OCR)
-- حلل الصورة بدقة واستخرج:
-  * أي نص مكتوب على العلبة أو الملصقات
-  * الشعارات والعلامات التجارية
-  * الأرقام التسلسلية ورموز المنتج
-  * الباركود (UPC/EAN) إن وجد
-- حدد نوع المنتج والمميزات الفريدة (شكل، لون، أزرار، حجم)
-- أنشئ كلمات مفتاحية دقيقة للبحث
+### Visual Audit & OCR:
+- قم بإجراء OCR لأي كود أو نص على العبوة
+- حلل "النية البحثية" (Search Intent): ما الكلمات المفتاحية التي سيستخدمها العميل؟
+- حدد البراند (Brand) والسلسلة (Series)
+- استخرج المميزات الفريدة: شكل، لون، أزرار، حجم
 
-### الخطوة 2: محاكاة البحث الأولي (Initial Search Simulation)
-- افترض أنك تبحث بالكلمات المفتاحية في Google Images وAmazon
-- حدد "اسم المنتج التجاري" الأقرب وماركته
-- تعرف على السلسلة والإصدار (Series/Generation)
+---
 
-### الخطوة 3: حلقة استخراج البيانات (Data Mining Loop) - الأهم!
-1. **من الاسم إلى الموديل:** ابحث عن رقم الموديل (Model Number/MPN) الدقيق
-2. **من الموديل إلى المعرفات:** استخدم رقم الموديل للعثور على:
-   - رقم ASIN (أمازون)
-   - أرقام القطع أو المعرفات الأخرى
-3. **من المعرفات إلى الباركود:** حوّل المعرفات للعثور على GTIN/EAN/UPC
+## 🎯 المرحلة الثانية: صيد المعرفات التقنية (The Identifier Hunt)
 
-### الخطوة 4: التحقق العكسي (Reverse Verification)
-- بعد العثور على البيانات، تحقق: هل البحث بالباركود يعيدنا لنفس المنتج؟
-- إذا كانت النتيجة متطابقة، اعتمد المعلومات
-- إذا لم تجد الباركود، اكتب رقم الموديل (MPN) بدلاً منه
+### البحث المتسلسل:
+1. **البحث عن MPN:** استخدم الكلمات المفتاحية للعثور على رقم تصنيع القطعة (Manufacturer Part Number)
+2. **البحث عن SKU/ASIN:** ابحث في Amazon/eBay لاستخراج الـ ASIN أو SKU
+3. **استخراج GTIN/EAN:** بناءً على MPN و ASIN، قم بالبحث المتقاطع (Cross-Reference) للعثور على الباركود العالمي
+
+---
+
+## ✅ المرحلة الثالثة: حلقة التحقق العكسي (Validation Loop)
+
+- قم بـ "بحث عكسي" بالباركود للتأكد أنه يظهر نفس المنتج
+- تأكد أن المواصفات تتطابق مع الصورة (اللون، الإصدار، الحجم)
+- إذا لم تجد الباركود، قدم رقم الموديل (MPN) بدقة عالية
 
 ---
 
 ## 📋 البيانات المطلوبة (JSON فقط):
 
-\`\`\`json
 {
-  "product_name": "[الماركة] [السلسلة] [الموديل] [السعة/الذاكرة] [اللون]",
-  "seo_title": "عنوان SEO جذاب ومختصر (50 حرف كحد أقصى)",
-  "marketing_description": "وصف تسويقي احترافي 50-100 كلمة يبرز المميزات",
-  "full_description": "وصف شامل يتضمن: المواصفات التقنية، محتويات العلبة، معلومات الضمان",
+  "product_name": "[الماركة] [السلسلة] [الموديل] [السعة/الذاكرة] [اللون] - اسم محسن للمتجر",
+  "seo_title": "عنوان SEO محسن لـ Google Shopping (50 حرف كحد أقصى)",
+  "marketing_description": "وصف تسويقي احترافي 50-100 كلمة مع كلمات مفتاحية رئيسية",
+  "full_description": "وصف شامل: المواصفات التقنية، محتويات العلبة، الضمان، مع Long-tail Keywords",
   "category": "التصنيف المناسب (مثال: هواتف ذكية، سماعات، أجهزة منزلية)",
   "brand": "اسم الماركة بالعربي",
-  "sku_barcode": "الباركود (UPC/EAN 12-13 رقم) أو رقم الموديل (MPN)"
+  "sku_barcode": "الباركود الدولي (GTIN/EAN/UPC 12-13 رقم) أو رقم الموديل (MPN)"
 }
-\`\`\`
 
 ---
 
 ## 🏷️ الماركات المعروفة:
-سامسونج، آبل، شاومي، هواوي، أوبو، فيفو، ريلمي، ون بلس، هونر، نوكيا، موتورولا، سوني، جوجل، إنفينكس، تكنو، ريدمي، بوكو، أنكر، جي بي إل، بوز، سوني، إل جي، فيليبس
+سامسونج، آبل، شاومي، هواوي، أوبو، فيفو، ريلمي، ون بلس، هونر، نوكيا، موتورولا، سوني، جوجل، إنفينكس، تكنو، ريدمي، بوكو، أنكر، جي بي إل، بوز، إل جي، فيليبس، لينوفو، أسوس، إتش بي، ديل
 
 ---
 
-## ⚠️ قواعد صارمة:
-1. **ممنوع "غير معروف" أو "Unknown" أو "N/A"** - يجب إيجاد كل البيانات
+## ⚠️ قواعد صارمة للـ SEO:
+1. **ممنوع "غير معروف" أو "Unknown" أو "N/A"** - ضروري لـ Google Merchant
 2. **لا تترك أي حقل فارغ** - استخدم معرفتك للاستنتاج
-3. **الأولوية للباركود** - إذا لم تجده، استخدم رقم الموديل
+3. **الأولوية للباركود (GTIN)** - ضروري لفهرسة المنتج
 4. **أجب بـ JSON فقط** - بدون markdown أو نص إضافي
 
 ---
@@ -212,39 +209,45 @@ export async function registerRoutes(
         const worksheet = workbook.worksheets[0];
         
         if (worksheet) {
-          worksheet.spliceRows(1, 1);
-          
           const newRowNumber = worksheet.rowCount + 1;
           const newRow = worksheet.getRow(newRowNumber);
           
-          newRow.getCell(1).value = "منتج";
-          newRow.getCell(2).value = validatedData.product_name;
-          newRow.getCell(3).value = validatedData.category;
-          newRow.getCell(4).value = "";
-          newRow.getCell(5).value = "";
-          newRow.getCell(6).value = "";
-          newRow.getCell(7).value = 0;
-          newRow.getCell(8).value = validatedData.full_description;
-          newRow.getCell(9).value = "نعم";
-          newRow.getCell(10).value = validatedData.sku_barcode;
-          newRow.getCell(11).value = 0;
-          newRow.getCell(12).value = "";
-          newRow.getCell(13).value = "";
-          newRow.getCell(14).value = "";
-          newRow.getCell(15).value = "";
-          newRow.getCell(16).value = "";
-          newRow.getCell(17).value = "";
-          newRow.getCell(18).value = 0.1;
-          newRow.getCell(19).value = "كيلوغرام";
-          newRow.getCell(20).value = validatedData.brand;
-          newRow.getCell(21).value = validatedData.seo_title;
-          newRow.getCell(22).value = "";
-          newRow.getCell(23).value = validatedData.sku_barcode;
-          newRow.getCell(24).value = "";
-          newRow.getCell(25).value = "";
-          newRow.getCell(26).value = "";
-          newRow.getCell(27).value = "تفعيل";
-          newRow.getCell(28).value = "";
+          const normalFont = { strike: false, bold: false };
+          
+          const setCellValue = (cellNum: number, value: string | number) => {
+            const cell = newRow.getCell(cellNum);
+            cell.value = value;
+            cell.font = normalFont;
+          };
+          
+          setCellValue(1, "منتج");
+          setCellValue(2, validatedData.product_name);
+          setCellValue(3, validatedData.category);
+          setCellValue(4, "");
+          setCellValue(5, "");
+          setCellValue(6, "");
+          setCellValue(7, 0);
+          setCellValue(8, validatedData.full_description);
+          setCellValue(9, "نعم");
+          setCellValue(10, validatedData.sku_barcode);
+          setCellValue(11, 0);
+          setCellValue(12, "");
+          setCellValue(13, "");
+          setCellValue(14, "");
+          setCellValue(15, "");
+          setCellValue(16, "");
+          setCellValue(17, "");
+          setCellValue(18, 0.1);
+          setCellValue(19, "كيلوغرام");
+          setCellValue(20, validatedData.brand);
+          setCellValue(21, validatedData.seo_title);
+          setCellValue(22, "");
+          setCellValue(23, validatedData.sku_barcode);
+          setCellValue(24, "");
+          setCellValue(25, "");
+          setCellValue(26, "");
+          setCellValue(27, "تفعيل");
+          setCellValue(28, "");
           
           newRow.commit();
         }
