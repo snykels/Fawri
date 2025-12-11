@@ -334,57 +334,92 @@ export async function registerRoutes(
       const validatedData = validationResult.data;
 
       const workbook = new ExcelJS.Workbook();
-      const worksheet = workbook.addWorksheet("Products", {
+      const worksheet = workbook.addWorksheet("Salla Products Template Sheet", {
         views: [{ rightToLeft: true }],
       });
+
+      const headerRow1 = [
+        "بيانات المنتج", "بيانات المنتج", "بيانات المنتج", "بيانات المنتج", "بيانات المنتج",
+        "بيانات المنتج", "بيانات المنتج", "بيانات المنتج", "بيانات المنتج", "بيانات المنتج",
+        "بيانات المنتج", "بيانات المنتج", "بيانات المنتج", "بيانات المنتج", "بيانات المنتج",
+        "بيانات المنتج", "بيانات المنتج", "بيانات المنتج", "بيانات المنتج",
+        "", "", "", "", "", "", "", "", "",
+      ];
 
       const headers = [
         "النوع",
         "أسم المنتج",
         "تصنيف المنتج",
-        "الماركة",
+        "صورة المنتج",
+        "وصف صورة المنتج",
+        "نوع المنتج",
+        "سعر المنتج",
         "الوصف",
-        "العنوان الترويجي",
-        "رمز المنتج sku",
-        "الباركود",
-        "عنوان صفحة المنتج (Page Title)",
-        "وصف تسويقي مختصر",
         "هل يتطلب شحن؟",
-        "السعر",
+        "رمز المنتج sku",
         "سعر التكلفة",
-        "الكمية",
+        "السعر المخفض",
+        "تاريخ بداية التخفيض",
+        "تاريخ نهاية التخفيض",
+        "اقصي كمية لكل عميل",
+        "إخفاء خيار تحديد الكمية",
+        "اضافة صورة عند الطلب",
         "الوزن",
+        "وحدة الوزن",
+        "الماركة",
+        "العنوان الترويجي",
+        "تثبيت المنتج",
+        "الباركود",
+        "السعرات الحرارية",
+        "MPN",
+        "GTIN",
         "خاضع للضريبة ؟",
+        "سبب عدم الخضوع للضريبة",
       ];
 
+      worksheet.addRow(headerRow1);
       worksheet.addRow(headers);
 
       worksheet.getRow(1).font = { bold: true };
       worksheet.getRow(1).alignment = { horizontal: "right" };
+      worksheet.getRow(2).font = { bold: true };
+      worksheet.getRow(2).alignment = { horizontal: "right" };
 
       const dataRow = [
         "منتج",
         validatedData.product_name || "",
         validatedData.category || "",
-        validatedData.brand || "",
+        "",
+        "",
+        "",
+        0,
         validatedData.full_description || "",
-        validatedData.subtitle || "",
-        validatedData.sku_barcode || "",
-        validatedData.sku_barcode || "",
-        validatedData.seo_title || "",
-        validatedData.marketing_description || "",
         "نعم",
+        validatedData.sku_barcode || "",
         0,
-        0,
-        0,
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
         0.1,
+        "كيلوغرام",
+        validatedData.brand || "",
+        validatedData.subtitle || "",
+        "",
+        validatedData.sku_barcode || "",
+        "",
+        "",
+        "",
         "تفعيل",
+        "",
       ];
 
       worksheet.addRow(dataRow);
 
       worksheet.columns.forEach((column) => {
-        column.width = 25;
+        column.width = 20;
       });
 
       const filename = validatedData.sku_barcode 
