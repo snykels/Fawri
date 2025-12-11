@@ -1,9 +1,27 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import OpenAI from "openai";
+import { GoogleGenAI } from "@google/genai";
 import ExcelJS from "exceljs";
 import sharp from "sharp";
 import { productDataSchema, type ProductData } from "@shared/schema";
+
+const systemPrompt = `You are a Salla E-commerce Expert. Analyze the Back Image for barcode/specs and Front Image for appearance.
+Output strictly valid JSON with keys: product_name, seo_title, marketing_description, full_description, category, brand, sku_barcode, subtitle.
+
+Rules:
+1. **Name:** [Brand] + [Model] + [Storage/RAM] + [Color].
+2. **SEO Title:** Max 50 chars, catchy.
+3. **Description:**
+   - Short Section (50-100 words).
+   - Long Section (Title, Short Desc, Detailed Features, Specs list, Box contents, Usage, Video URL).
+   - No Emojis, No markdown symbols like ###.
+4. **Data:**
+   - Extract Barcode from image.
+   - Verify specs (RAM/Storage) from text in the image.
+   - If text is blurry, infer from visual model identity.
+
+Respond with JSON only, no markdown formatting or code blocks.`;
 
 export async function registerRoutes(
   httpServer: Server,
@@ -12,7 +30,7 @@ export async function registerRoutes(
 
   app.post("/api/generate", async (req, res) => {
     try {
-      const { frontImage, backImage, apiKey } = req.body;
+      const { frontImage, backImage, apiKey, provider = "gemini" } = req.body;
 
       if (!frontImage || !backImage) {
         return res.status(400).json({
@@ -21,10 +39,10 @@ export async function registerRoutes(
         });
       }
 
-      if (!apiKey) {
+      if (provider === "openai" && !apiKey) {
         return res.status(400).json({
           success: false,
-          error: "OpenAI API key is required",
+          error: "OpenAI API key is required when using OpenAI provider",
         });
       }
 
@@ -49,60 +67,117 @@ export async function registerRoutes(
         processImage(backImage),
       ]);
 
-      // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
-      const openai = new OpenAI({ apiKey });
+      let content: string | null = null;
 
-      const systemPrompt = `You are a Salla E-commerce Expert. Analyze the Back Image for barcode/specs and Front Image for appearance.
-Output strictly valid JSON with keys: product_name, seo_title, marketing_description, full_description, category, brand, sku_barcode, subtitle.
-
-Rules:
-1. **Name:** [Brand] + [Model] + [Storage/RAM] + [Color].
-2. **SEO Title:** Max 50 chars, catchy.
-3. **Description:**
-   - Short Section (50-100 words).
-   - Long Section (Title, Short Desc, Detailed Features, Specs list, Box contents, Usage, Video URL).
-   - No Emojis, No markdown symbols like ###.
-4. **Data:**
-   - Extract Barcode from image.
-   - Verify specs (RAM/Storage) from text in the image.
-   - If text is blurry, infer from visual model identity.
-
-Respond with JSON only, no markdown formatting or code blocks.`;
-
-      const response = await openai.chat.completions.create({
-        model: "gpt-5",
-        messages: [
-          {
-            role: "system",
-            content: systemPrompt,
+      if (provider === "gemini") {
+        // Using Replit's AI Integrations service for Gemini - no API key needed
+        const ai = new GoogleGenAI({
+          apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
+          httpOptions: {
+            apiVersion: "",
+            baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL,
           },
-          {
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text: "Analyze these product images and generate a complete Salla e-commerce listing. The first image is the front product shot, and the second is the back with specs and barcode.",
-              },
-              {
-                type: "image_url",
-                image_url: {
-                  url: `data:image/jpeg;base64,${processedFront}`,
-                },
-              },
-              {
-                type: "image_url",
-                image_url: {
-                  url: `data:image/jpeg;base64,${processedBack}`,
-                },
-              },
-            ],
-          },
-        ],
-        response_format: { type: "json_object" },
-        max_completion_tokens: 2048,
-      });
+        });
 
-      const content = response.choices[0].message.content;
+        const response = await ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: [
+            {
+              role: "user",
+              parts: [
+                { text: systemPrompt },
+                { text: "Analyze these product images and generate a complete Salla e-commerce listing. The first image is the front product shot, and the second is the back with specs and barcode." },
+                { inlineData: { mimeType: "image/jpeg", data: processedFront } },
+                { inlineData: { mimeType: "image/jpeg", data: processedBack } },
+              ],
+            },
+          ],
+        });
+
+        content = response.text || null;
+
+      } else if (provider === "openrouter") {
+        // Using Replit's AI Integrations service for OpenRouter - no API key needed
+        const openrouter = new OpenAI({
+          baseURL: process.env.AI_INTEGRATIONS_OPENROUTER_BASE_URL,
+          apiKey: process.env.AI_INTEGRATIONS_OPENROUTER_API_KEY,
+        });
+
+        const response = await openrouter.chat.completions.create({
+          model: "meta-llama/llama-4-maverick",
+          messages: [
+            {
+              role: "system",
+              content: systemPrompt,
+            },
+            {
+              role: "user",
+              content: [
+                {
+                  type: "text",
+                  text: "Analyze these product images and generate a complete Salla e-commerce listing. The first image is the front product shot, and the second is the back with specs and barcode.",
+                },
+                {
+                  type: "image_url",
+                  image_url: {
+                    url: `data:image/jpeg;base64,${processedFront}`,
+                  },
+                },
+                {
+                  type: "image_url",
+                  image_url: {
+                    url: `data:image/jpeg;base64,${processedBack}`,
+                  },
+                },
+              ],
+            },
+          ],
+          max_tokens: 2048,
+        });
+
+        content = response.choices[0].message.content;
+
+      } else {
+        // OpenAI with user's API key
+        // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
+        const openai = new OpenAI({ apiKey });
+
+        const response = await openai.chat.completions.create({
+          model: "gpt-5",
+          messages: [
+            {
+              role: "system",
+              content: systemPrompt,
+            },
+            {
+              role: "user",
+              content: [
+                {
+                  type: "text",
+                  text: "Analyze these product images and generate a complete Salla e-commerce listing. The first image is the front product shot, and the second is the back with specs and barcode.",
+                },
+                {
+                  type: "image_url",
+                  image_url: {
+                    url: `data:image/jpeg;base64,${processedFront}`,
+                  },
+                },
+                {
+                  type: "image_url",
+                  image_url: {
+                    url: `data:image/jpeg;base64,${processedBack}`,
+                  },
+                },
+              ],
+            },
+          ],
+          response_format: { type: "json_object" },
+          max_completion_tokens: 2048,
+        });
+
+        content = response.choices[0].message.content;
+      }
+
       if (!content) {
         return res.status(500).json({
           success: false,

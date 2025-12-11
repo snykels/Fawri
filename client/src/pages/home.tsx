@@ -6,8 +6,10 @@ import { ProductPreview } from "@/components/product-preview";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import type { AIProvider } from "@/components/settings-drawer";
 import {
   Loader2,
   Sparkles,
@@ -25,6 +27,12 @@ export default function Home() {
     }
     return "";
   });
+  const [provider, setProvider] = useState<AIProvider>(() => {
+    if (typeof window !== "undefined") {
+      return (localStorage.getItem("ai_provider") as AIProvider) || "gemini";
+    }
+    return "gemini";
+  });
   const [frontImage, setFrontImage] = useState<File | null>(null);
   const [backImage, setBackImage] = useState<File | null>(null);
   const [productData, setProductData] = useState<ProductData | null>(null);
@@ -33,6 +41,11 @@ export default function Home() {
   const handleApiKeyChange = useCallback((key: string) => {
     setApiKey(key);
     localStorage.setItem("openai_api_key", key);
+  }, []);
+
+  const handleProviderChange = useCallback((newProvider: AIProvider) => {
+    setProvider(newProvider);
+    localStorage.setItem("ai_provider", newProvider);
   }, []);
 
   const fileToBase64 = (file: File): Promise<string> => {
@@ -65,7 +78,8 @@ export default function Home() {
         {
           frontImage: frontBase64,
           backImage: backBase64,
-          apiKey,
+          apiKey: provider === "openai" ? apiKey : undefined,
+          provider,
         }
       );
 
@@ -134,11 +148,31 @@ export default function Home() {
     },
   });
 
-  const canGenerate = frontImage && backImage && apiKey;
+  const needsApiKey = provider === "openai";
+  const isConfigured = !needsApiKey || apiKey.length > 0;
+  const canGenerate = frontImage && backImage && isConfigured;
+
+  const getProviderLabel = () => {
+    switch (provider) {
+      case "gemini":
+        return "Gemini";
+      case "openrouter":
+        return "OpenRouter";
+      case "openai":
+        return "OpenAI";
+      default:
+        return provider;
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
-      <Header apiKey={apiKey} onApiKeyChange={handleApiKeyChange} />
+      <Header
+        apiKey={apiKey}
+        onApiKeyChange={handleApiKeyChange}
+        provider={provider}
+        onProviderChange={handleProviderChange}
+      />
 
       <main className="max-w-6xl mx-auto px-6 py-8">
         <div className="space-y-8">
@@ -152,9 +186,19 @@ export default function Home() {
               complete Salla-ready listing. We'll extract the barcode, specs,
               and create optimized descriptions.
             </p>
+            <div className="flex justify-center gap-2">
+              <Badge variant="secondary" className="text-xs">
+                Using: {getProviderLabel()}
+              </Badge>
+              {!needsApiKey && (
+                <Badge variant="outline" className="text-xs text-green-600 border-green-500/50">
+                  No API Key Required
+                </Badge>
+              )}
+            </div>
           </div>
 
-          {!apiKey && (
+          {!isConfigured && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>API Key Required</AlertTitle>
@@ -219,9 +263,12 @@ export default function Home() {
                   <div className="absolute inset-0 h-16 w-16 rounded-full border-4 border-primary border-t-transparent animate-spin" />
                 </div>
                 <div className="text-center space-y-2">
-                  <p className="font-medium">Processing your images...</p>
+                  <p className="font-medium">Processing your images with {getProviderLabel()}...</p>
                   <p className="text-sm text-muted-foreground">
                     Our AI is analyzing the product details, barcode, and specs
+                  </p>
+                  <p className="text-sm text-muted-foreground font-arabic" dir="rtl">
+                    جاري تحليل صور المنتج...
                   </p>
                 </div>
               </div>

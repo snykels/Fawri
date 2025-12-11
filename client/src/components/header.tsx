@@ -1,13 +1,20 @@
 import { ThemeToggle } from "./theme-toggle";
-import { SettingsDrawer } from "./settings-drawer";
+import { SettingsDrawer, type AIProvider } from "./settings-drawer";
 import { FileSpreadsheet } from "lucide-react";
 
 interface HeaderProps {
   apiKey: string;
   onApiKeyChange: (key: string) => void;
+  provider: AIProvider;
+  onProviderChange: (provider: AIProvider) => void;
 }
 
-export function Header({ apiKey, onApiKeyChange }: HeaderProps) {
+export function Header({
+  apiKey,
+  onApiKeyChange,
+  provider,
+  onProviderChange,
+}: HeaderProps) {
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="flex h-16 items-center justify-between gap-4 px-6">
@@ -32,7 +39,12 @@ export function Header({ apiKey, onApiKeyChange }: HeaderProps) {
 
         <div className="flex items-center gap-2">
           <ThemeToggle />
-          <SettingsDrawer apiKey={apiKey} onApiKeyChange={onApiKeyChange} />
+          <SettingsDrawer
+            apiKey={apiKey}
+            onApiKeyChange={onApiKeyChange}
+            provider={provider}
+            onProviderChange={onProviderChange}
+          />
         </div>
       </div>
     </header>
