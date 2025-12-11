@@ -9,7 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import type { AIProvider } from "@/components/settings-drawer";
+import type { ProviderSettings } from "@/components/settings-drawer";
 import {
   Loader2,
   Sparkles,
@@ -20,32 +20,35 @@ import {
 } from "lucide-react";
 import type { ProductData, GenerateListingResponse } from "@shared/schema";
 
+const defaultSettings: ProviderSettings = {
+  provider: "gemini",
+  openaiKey: "",
+  geminiKey: "",
+  openrouterKey: "",
+};
+
 export default function Home() {
-  const [apiKey, setApiKey] = useState(() => {
+  const [settings, setSettings] = useState<ProviderSettings>(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem("openai_api_key") || "";
+      const saved = localStorage.getItem("ai_settings");
+      if (saved) {
+        try {
+          return { ...defaultSettings, ...JSON.parse(saved) };
+        } catch {
+          return defaultSettings;
+        }
+      }
     }
-    return "";
-  });
-  const [provider, setProvider] = useState<AIProvider>(() => {
-    if (typeof window !== "undefined") {
-      return (localStorage.getItem("ai_provider") as AIProvider) || "gemini";
-    }
-    return "gemini";
+    return defaultSettings;
   });
   const [frontImage, setFrontImage] = useState<File | null>(null);
   const [backImage, setBackImage] = useState<File | null>(null);
   const [productData, setProductData] = useState<ProductData | null>(null);
   const { toast } = useToast();
 
-  const handleApiKeyChange = useCallback((key: string) => {
-    setApiKey(key);
-    localStorage.setItem("openai_api_key", key);
-  }, []);
-
-  const handleProviderChange = useCallback((newProvider: AIProvider) => {
-    setProvider(newProvider);
-    localStorage.setItem("ai_provider", newProvider);
+  const handleSettingsChange = useCallback((newSettings: ProviderSettings) => {
+    setSettings(newSettings);
+    localStorage.setItem("ai_settings", JSON.stringify(newSettings));
   }, []);
 
   const fileToBase64 = (file: File): Promise<string> => {
@@ -61,6 +64,17 @@ export default function Home() {
     });
   };
 
+  const getCurrentApiKey = () => {
+    switch (settings.provider) {
+      case "openai":
+        return settings.openaiKey;
+      case "gemini":
+        return settings.geminiKey;
+      case "openrouter":
+        return settings.openrouterKey;
+    }
+  };
+
   const generateMutation = useMutation({
     mutationFn: async () => {
       if (!frontImage || !backImage) {
@@ -72,16 +86,18 @@ export default function Home() {
         fileToBase64(backImage),
       ]);
 
-      const response = await apiRequest<GenerateListingResponse>(
+      const res = await apiRequest(
         "POST",
         "/api/generate",
         {
           frontImage: frontBase64,
           backImage: backBase64,
-          apiKey: provider === "openai" ? apiKey : undefined,
-          provider,
+          apiKey: getCurrentApiKey() || undefined,
+          provider: settings.provider,
         }
       );
+
+      const response = await res.json() as GenerateListingResponse;
 
       if (!response.success || !response.data) {
         throw new Error(response.error || "Failed to generate listing");
@@ -148,12 +164,13 @@ export default function Home() {
     },
   });
 
-  const needsApiKey = provider === "openai";
-  const isConfigured = !needsApiKey || apiKey.length > 0;
+  const hasBuiltInSupport = settings.provider !== "openai";
+  const hasApiKey = getCurrentApiKey().length > 0;
+  const isConfigured = hasBuiltInSupport || hasApiKey;
   const canGenerate = frontImage && backImage && isConfigured;
 
   const getProviderLabel = () => {
-    switch (provider) {
+    switch (settings.provider) {
       case "gemini":
         return "Gemini";
       case "openrouter":
@@ -161,17 +178,15 @@ export default function Home() {
       case "openai":
         return "OpenAI";
       default:
-        return provider;
+        return settings.provider;
     }
   };
 
   return (
     <div className="min-h-screen bg-background">
       <Header
-        apiKey={apiKey}
-        onApiKeyChange={handleApiKeyChange}
-        provider={provider}
-        onProviderChange={handleProviderChange}
+        settings={settings}
+        onSettingsChange={handleSettingsChange}
       />
 
       <main className="max-w-6xl mx-auto px-6 py-8">
@@ -186,13 +201,18 @@ export default function Home() {
               complete Salla-ready listing. We'll extract the barcode, specs,
               and create optimized descriptions.
             </p>
-            <div className="flex justify-center gap-2">
+            <div className="flex justify-center gap-2 flex-wrap">
               <Badge variant="secondary" className="text-xs">
                 Using: {getProviderLabel()}
               </Badge>
-              {!needsApiKey && (
+              {hasApiKey && (
                 <Badge variant="outline" className="text-xs text-green-600 border-green-500/50">
-                  No API Key Required
+                  Your API Key
+                </Badge>
+              )}
+              {hasBuiltInSupport && !hasApiKey && (
+                <Badge variant="outline" className="text-xs text-blue-600 border-blue-500/50">
+                  Built-in Credits
                 </Badge>
               )}
             </div>

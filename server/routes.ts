@@ -39,13 +39,6 @@ export async function registerRoutes(
         });
       }
 
-      if (provider === "openai" && !apiKey) {
-        return res.status(400).json({
-          success: false,
-          error: "OpenAI API key is required when using OpenAI provider",
-        });
-      }
-
       const processImage = async (base64Image: string): Promise<string> => {
         const cleanBase64 = base64Image.replace(/^data:image\/\w+;base64,/, "");
         const imageBuffer = Buffer.from(cleanBase64, "base64");
@@ -70,13 +63,29 @@ export async function registerRoutes(
       let content: string | null = null;
 
       if (provider === "gemini") {
-        // Using Replit's AI Integrations service for Gemini - no API key needed
+        let geminiApiKey = apiKey;
+        let baseUrl = undefined;
+        let apiVersion = "v1beta";
+
+        if (!geminiApiKey && process.env.AI_INTEGRATIONS_GEMINI_API_KEY) {
+          geminiApiKey = process.env.AI_INTEGRATIONS_GEMINI_API_KEY;
+          baseUrl = process.env.AI_INTEGRATIONS_GEMINI_BASE_URL;
+          apiVersion = "";
+        }
+
+        if (!geminiApiKey) {
+          return res.status(400).json({
+            success: false,
+            error: "Gemini API key is required. Please add your key in Settings or use built-in credits.",
+          });
+        }
+
         const ai = new GoogleGenAI({
-          apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
-          httpOptions: {
-            apiVersion: "",
-            baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL,
-          },
+          apiKey: geminiApiKey,
+          httpOptions: baseUrl ? {
+            apiVersion,
+            baseUrl,
+          } : undefined,
         });
 
         const response = await ai.models.generateContent({
@@ -97,14 +106,28 @@ export async function registerRoutes(
         content = response.text || null;
 
       } else if (provider === "openrouter") {
-        // Using Replit's AI Integrations service for OpenRouter - no API key needed
+        let openrouterApiKey = apiKey;
+        let baseUrl = "https://openrouter.ai/api/v1";
+
+        if (!openrouterApiKey && process.env.AI_INTEGRATIONS_OPENROUTER_API_KEY) {
+          openrouterApiKey = process.env.AI_INTEGRATIONS_OPENROUTER_API_KEY;
+          baseUrl = process.env.AI_INTEGRATIONS_OPENROUTER_BASE_URL || baseUrl;
+        }
+
+        if (!openrouterApiKey) {
+          return res.status(400).json({
+            success: false,
+            error: "OpenRouter API key is required. Please add your key in Settings or use built-in credits.",
+          });
+        }
+
         const openrouter = new OpenAI({
-          baseURL: process.env.AI_INTEGRATIONS_OPENROUTER_BASE_URL,
-          apiKey: process.env.AI_INTEGRATIONS_OPENROUTER_API_KEY,
+          baseURL: baseUrl,
+          apiKey: openrouterApiKey,
         });
 
         const response = await openrouter.chat.completions.create({
-          model: "meta-llama/llama-4-maverick",
+          model: "google/gemini-2.5-flash-preview",
           messages: [
             {
               role: "system",
@@ -138,12 +161,17 @@ export async function registerRoutes(
         content = response.choices[0].message.content;
 
       } else {
-        // OpenAI with user's API key
-        // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
+        if (!apiKey) {
+          return res.status(400).json({
+            success: false,
+            error: "OpenAI API key is required. Please add your key in Settings.",
+          });
+        }
+
         const openai = new OpenAI({ apiKey });
 
         const response = await openai.chat.completions.create({
-          model: "gpt-5",
+          model: "gpt-4o",
           messages: [
             {
               role: "system",
@@ -172,7 +200,7 @@ export async function registerRoutes(
             },
           ],
           response_format: { type: "json_object" },
-          max_completion_tokens: 2048,
+          max_tokens: 2048,
         });
 
         content = response.choices[0].message.content;

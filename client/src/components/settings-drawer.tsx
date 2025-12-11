@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Settings, Key, CheckCircle, AlertCircle, Cpu } from "lucide-react";
+import { Settings, Key, CheckCircle, AlertCircle, Cpu, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,40 +18,94 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export type AIProvider = "openai" | "gemini" | "openrouter";
 
-interface SettingsDrawerProps {
-  apiKey: string;
-  onApiKeyChange: (key: string) => void;
+export interface ProviderSettings {
   provider: AIProvider;
-  onProviderChange: (provider: AIProvider) => void;
+  openaiKey: string;
+  geminiKey: string;
+  openrouterKey: string;
+}
+
+interface SettingsDrawerProps {
+  settings: ProviderSettings;
+  onSettingsChange: (settings: ProviderSettings) => void;
 }
 
 export function SettingsDrawer({
-  apiKey,
-  onApiKeyChange,
-  provider,
-  onProviderChange,
+  settings,
+  onSettingsChange,
 }: SettingsDrawerProps) {
-  const [localKey, setLocalKey] = useState(apiKey);
-  const [localProvider, setLocalProvider] = useState<AIProvider>(provider);
+  const [localSettings, setLocalSettings] = useState<ProviderSettings>(settings);
   const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
-    setLocalKey(apiKey);
-    setLocalProvider(provider);
-  }, [apiKey, provider]);
+    setLocalSettings(settings);
+  }, [settings]);
 
   const handleSave = () => {
-    onApiKeyChange(localKey);
-    onProviderChange(localProvider);
+    onSettingsChange(localSettings);
     setIsOpen(false);
   };
 
-  const needsApiKey = localProvider === "openai";
-  const hasApiKey = apiKey.length > 0;
-  const isConfigured = !needsApiKey || hasApiKey;
+  const getCurrentApiKey = () => {
+    switch (localSettings.provider) {
+      case "openai":
+        return localSettings.openaiKey;
+      case "gemini":
+        return localSettings.geminiKey;
+      case "openrouter":
+        return localSettings.openrouterKey;
+    }
+  };
+
+  const setCurrentApiKey = (key: string) => {
+    switch (localSettings.provider) {
+      case "openai":
+        setLocalSettings({ ...localSettings, openaiKey: key });
+        break;
+      case "gemini":
+        setLocalSettings({ ...localSettings, geminiKey: key });
+        break;
+      case "openrouter":
+        setLocalSettings({ ...localSettings, openrouterKey: key });
+        break;
+    }
+  };
+
+  const hasBuiltInSupport = localSettings.provider !== "openai";
+  const hasApiKey = getCurrentApiKey().length > 0;
+  const isConfigured = hasBuiltInSupport || hasApiKey;
+
+  const getProviderInfo = () => {
+    switch (localSettings.provider) {
+      case "openai":
+        return {
+          label: "OpenAI API Key",
+          placeholder: "sk-...",
+          helpText: "Get your key from platform.openai.com/api-keys",
+          helpTextAr: "احصل على مفتاحك من platform.openai.com",
+        };
+      case "gemini":
+        return {
+          label: "Google AI API Key (Optional)",
+          placeholder: "AIza...",
+          helpText: "Leave empty to use built-in credits, or enter your own key from aistudio.google.com",
+          helpTextAr: "اتركه فارغاً لاستخدام الرصيد المدمج، أو أدخل مفتاحك الخاص",
+        };
+      case "openrouter":
+        return {
+          label: "OpenRouter API Key (Optional)",
+          placeholder: "sk-or-...",
+          helpText: "Leave empty to use built-in credits, or enter your own key from openrouter.ai",
+          helpTextAr: "اتركه فارغاً لاستخدام الرصيد المدمج، أو أدخل مفتاحك الخاص",
+        };
+    }
+  };
+
+  const providerInfo = getProviderInfo();
 
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
@@ -70,7 +124,7 @@ export function SettingsDrawer({
           )}
         </Button>
       </SheetTrigger>
-      <SheetContent className="w-80">
+      <SheetContent className="w-80 overflow-y-auto">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             <Settings className="h-5 w-5" />
@@ -88,79 +142,78 @@ export function SettingsDrawer({
             <Label htmlFor="ai-provider" className="flex items-center gap-2">
               <Cpu className="h-4 w-4" />
               AI Provider
-              <span className="font-arabic" dir="rtl">مزود الذكاء الاصطناعي</span>
             </Label>
+            <p className="text-xs text-muted-foreground font-arabic" dir="rtl">
+              مزود الذكاء الاصطناعي
+            </p>
             <Select
-              value={localProvider}
-              onValueChange={(val) => setLocalProvider(val as AIProvider)}
+              value={localSettings.provider}
+              onValueChange={(val) => setLocalSettings({ ...localSettings, provider: val as AIProvider })}
             >
               <SelectTrigger id="ai-provider" data-testid="select-provider">
                 <SelectValue placeholder="Select AI provider" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="gemini">
-                  Gemini (Built-in - No API Key)
+                  Gemini (Google AI)
                 </SelectItem>
                 <SelectItem value="openrouter">
-                  OpenRouter (Built-in - No API Key)
+                  OpenRouter (Multiple Models)
                 </SelectItem>
                 <SelectItem value="openai">
-                  OpenAI (Requires API Key)
+                  OpenAI (GPT-4o)
                 </SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="space-y-3">
+            <Label htmlFor="api-key" className="flex items-center gap-2">
+              <Key className="h-4 w-4" />
+              {providerInfo.label}
+            </Label>
+            <Input
+              id="api-key"
+              type="password"
+              placeholder={providerInfo.placeholder}
+              value={getCurrentApiKey()}
+              onChange={(e) => setCurrentApiKey(e.target.value)}
+              data-testid="input-api-key"
+            />
             <p className="text-xs text-muted-foreground">
-              {localProvider === "gemini" && (
-                <>Gemini uses Replit AI Integrations - charges billed to your credits.</>
-              )}
-              {localProvider === "openrouter" && (
-                <>OpenRouter uses Replit AI Integrations - charges billed to your credits.</>
-              )}
-              {localProvider === "openai" && (
-                <>OpenAI requires your own API key from platform.openai.com</>
-              )}
+              {providerInfo.helpText}
+            </p>
+            <p className="text-xs text-muted-foreground font-arabic" dir="rtl">
+              {providerInfo.helpTextAr}
             </p>
           </div>
 
-          {needsApiKey && (
-            <div className="space-y-3">
-              <Label htmlFor="api-key" className="flex items-center gap-2">
-                <Key className="h-4 w-4" />
-                OpenAI API Key
-              </Label>
-              <Input
-                id="api-key"
-                type="password"
-                placeholder="sk-..."
-                value={localKey}
-                onChange={(e) => setLocalKey(e.target.value)}
-                data-testid="input-api-key"
-              />
-              <div className="flex items-center gap-2 text-xs">
-                {hasApiKey ? (
-                  <>
-                    <CheckCircle className="h-3 w-3 text-green-500" />
-                    <span className="text-green-600 dark:text-green-400">
-                      API key configured
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <AlertCircle className="h-3 w-3 text-destructive" />
-                    <span className="text-destructive">
-                      API key required for OpenAI
-                    </span>
-                  </>
-                )}
-              </div>
-            </div>
+          {hasBuiltInSupport && !hasApiKey && (
+            <Alert className="border-blue-500/50 bg-blue-500/10">
+              <Info className="h-4 w-4 text-blue-600" />
+              <AlertDescription className="text-sm text-blue-600 dark:text-blue-400">
+                Using built-in credits. Charges will be billed to your Replit account.
+              </AlertDescription>
+              <p className="text-xs font-arabic mt-1 text-blue-600" dir="rtl">
+                يتم استخدام الرصيد المدمج. ستُحسب الرسوم على حساب Replit الخاص بك.
+              </p>
+            </Alert>
           )}
 
-          {!needsApiKey && (
+          {hasApiKey && (
             <div className="flex items-center gap-2 p-3 rounded-lg bg-green-500/10 border border-green-500/30">
               <CheckCircle className="h-4 w-4 text-green-600" />
               <span className="text-sm text-green-600 dark:text-green-400">
-                Ready to use - no API key needed
+                Using your API key
+              </span>
+            </div>
+          )}
+
+          {!isConfigured && (
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/30">
+              <AlertCircle className="h-4 w-4 text-destructive" />
+              <span className="text-sm text-destructive">
+                API key required for OpenAI
               </span>
             </div>
           )}
@@ -171,6 +224,7 @@ export function SettingsDrawer({
             data-testid="button-save-settings"
           >
             Save Settings
+            <span className="font-arabic mr-2">حفظ</span>
           </Button>
         </div>
       </SheetContent>
