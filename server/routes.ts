@@ -10,7 +10,7 @@ import { productDataSchema, type ProductData } from "@shared/schema";
 const smartAnalysisPrompt = `**أنت ثلاثة خبراء في شخص واحد:**
 1. **وكيل استخبارات المنتجات (Product Intelligence Agent)** - متخصص في البحث العكسي (OSINT)
 2. **خبير SEO للتجارة الإلكترونية (Technical eCommerce SEO Specialist)** - محلل بيانات منتجات
-3. **محقق صور المنتجات (Image Verification Agent)** - يتحقق من روابط الصور
+3. **باحث صور المنتجات (Product Image Researcher)** - يبحث عن أفضل صور احترافية من المصادر الرسمية
 
 مهمتك: تحليل صور المنتج واستخراج "البصمة الرقمية الكاملة" باتباع منهجية البحث الاستخباراتي المتسلسل.
 
@@ -43,6 +43,24 @@ const smartAnalysisPrompt = `**أنت ثلاثة خبراء في شخص واحد
 
 ---
 
+## 🖼️ المرحلة الرابعة: البحث عن صورة احترافية
+
+### مهم جداً - ابحث عن صورة المنتج الرسمية:
+بعد تحديد المنتج، ابحث عن صورة احترافية من المصادر التالية بالترتيب:
+
+1. **الموقع الرسمي للشركة المصنعة** (samsung.com, apple.com, xiaomi.com, etc.)
+2. **GSMArena** للهواتف والتابلت (fdn.gsmarena.com)
+3. **Amazon** (m.media-amazon.com, images-na.ssl-images-amazon.com)
+4. **Noon** (f.nooncdn.com)
+
+### متطلبات الصورة:
+- يجب أن تكون HTTPS
+- يجب أن تكون صورة واضحة للمنتج على خلفية بيضاء أو شفافة
+- يجب أن تطابق اللون والموديل المحدد
+- يفضل الصور عالية الجودة (PNG أو JPG)
+
+---
+
 ## 📱 للهواتف والتابلت - وصف مفصل:
 
 ### الوصف التسويقي (50-100 كلمة):
@@ -69,7 +87,8 @@ const smartAnalysisPrompt = `**أنت ثلاثة خبراء في شخص واحد
   "full_description": "وصف شامل 200-500 كلمة: المواصفات التفصيلية، محتويات العلبة، نسخة الشرق الأوسط",
   "category": "التصنيف (هواتف ذكية / تابلت / سماعات / أجهزة منزلية)",
   "brand": "اسم الماركة بالعربي",
-  "sku_barcode": "الباركود (GTIN/EAN/UPC 12-13 رقم) أو رقم الموديل (MPN)"
+  "sku_barcode": "الباركود (GTIN/EAN/UPC 12-13 رقم) أو رقم الموديل (MPN)",
+  "product_image_url": "رابط HTTPS لصورة احترافية من المصدر الرسمي أو GSMArena أو Amazon"
 }
 
 ---
@@ -85,6 +104,7 @@ const smartAnalysisPrompt = `**أنت ثلاثة خبراء في شخص واحد
 3. **الأولوية للباركود (GTIN)**
 4. **أجب بـ JSON فقط** - بدون markdown
 5. **ممنوع الفيسات التعبيرية**
+6. **product_image_url يجب أن يكون رابط HTTPS حقيقي من مصدر موثوق**
 
 ---
 
@@ -186,31 +206,54 @@ export async function registerRoutes(
         });
       }
 
-      // Upload the processed front image to imgbb for a permanent URL
-      const imgbbApiKey = process.env.IMGBB_API_KEY;
-      if (imgbbApiKey) {
+      // Validate product_image_url is from trusted sources
+      if (productData.product_image_url) {
+        const trustedImageDomains = [
+          "gsmarena.com",
+          "fdn.gsmarena.com",
+          "fdn2.gsmarena.com",
+          "amazon.com",
+          "m.media-amazon.com",
+          "images-na.ssl-images-amazon.com",
+          "images-eu.ssl-images-amazon.com",
+          "noon.com",
+          "f.nooncdn.com",
+          "samsung.com",
+          "images.samsung.com",
+          "image-us.samsung.com",
+          "apple.com",
+          "store.storeimages.cdn-apple.com",
+          "xiaomi.com",
+          "i01.appmifile.com",
+          "i02.appmifile.com",
+          "oppo.com",
+          "image.oppo.com",
+          "vivo.com",
+          "realme.com",
+          "infinixmobility.com",
+          "tecno-mobile.com",
+          "oneplus.com",
+          "opc.img.shopping.com",
+          "cdn.shopify.com",
+          "static.wixstatic.com",
+        ];
+
         try {
-          const formData = new URLSearchParams();
-          formData.append("key", imgbbApiKey);
-          formData.append("image", processedFrontBase64);
-
-          const imgbbResponse = await fetch("https://api.imgbb.com/1/upload", {
-            method: "POST",
-            body: formData,
-          });
-
-          if (imgbbResponse.ok) {
-            const imgbbResult = await imgbbResponse.json();
-            if (imgbbResult.success && imgbbResult.data?.url) {
-              productData.product_image_url = imgbbResult.data.url;
-            }
+          const imageUrl = new URL(productData.product_image_url);
+          const hostname = imageUrl.hostname.toLowerCase();
+          const isTrusted = imageUrl.protocol === "https:" && 
+            trustedImageDomains.some(domain => hostname === domain || hostname.endsWith("." + domain));
+          
+          if (!isTrusted) {
+            console.log("Rejected untrusted image URL:", productData.product_image_url);
+            productData.product_image_url = "";
           }
-        } catch (imgbbError) {
-          console.error("imgbb upload failed:", imgbbError);
-          // Continue without uploaded image URL - will use base64 fallback
+        } catch {
+          // Invalid URL format
+          productData.product_image_url = "";
         }
       }
-
+      
       return res.json({
         success: true,
         data: productData,

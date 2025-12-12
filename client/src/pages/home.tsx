@@ -257,150 +257,20 @@ export default function Home() {
           )}
 
           {productData && !generateMutation.isPending && (
-            <div className="space-y-6" dir="rtl">
+            <div className="space-y-4" dir="rtl">
+              {/* Header with status */}
+              <div className="flex items-center justify-between gap-4">
+                <Badge variant="secondary" className="text-xs">
+                  <Check className="h-3 w-3 ml-1" />
+                  تم التحليل بنجاح
+                </Badge>
+              </div>
+
+              {/* Product Image - Prominent Display */}
               <Card className="overflow-visible">
-                <div className="p-6 border-b">
-                  <div className="flex items-center justify-between gap-4 flex-wrap">
-                    <div className="flex items-center gap-4">
-                      <div className="w-16 h-16 rounded-lg bg-white border overflow-hidden flex-shrink-0">
-                        {productData.product_image_url ? (
-                          <img
-                            src={productData.product_image_url}
-                            alt={productData.product_name}
-                            className="w-full h-full object-contain"
-                            data-testid="img-product-thumb"
-                            onError={(e) => {
-                              if (frontImageBase64) {
-                                e.currentTarget.src = `data:image/jpeg;base64,${frontImageBase64}`;
-                              }
-                            }}
-                          />
-                        ) : frontImageBase64 ? (
-                          <img
-                            src={`data:image/jpeg;base64,${frontImageBase64}`}
-                            alt={productData.product_name}
-                            className="w-full h-full object-contain"
-                            data-testid="img-product-thumb"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center bg-muted">
-                            <Package className="h-6 w-6 text-muted-foreground" />
-                          </div>
-                        )}
-                      </div>
-                      <div className="space-y-1">
-                        <button
-                          type="button" 
-                          className="text-xl font-bold font-arabic cursor-pointer hover:text-primary transition-colors text-right block" 
-                          data-testid="button-copy-product-name"
-                          onClick={() => handleCopyText(productData.product_name, "اسم المنتج")}
-                          title="انقر للنسخ"
-                        >
-                          {productData.product_name}
-                        </button>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <button 
-                            type="button"
-                            className="inline-flex items-center rounded-md border border-transparent bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-semibold cursor-pointer hover:bg-primary/20 transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                            onClick={() => handleCopyText(productData.brand, "الماركة")}
-                            aria-label={`نسخ الماركة: ${productData.brand}`}
-                            data-testid="button-copy-brand"
-                          >
-                            {productData.brand}
-                          </button>
-                          <button 
-                            type="button"
-                            className="inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold cursor-pointer hover:bg-accent transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                            onClick={() => handleCopyText(productData.category, "التصنيف")}
-                            aria-label={`نسخ التصنيف: ${productData.category}`}
-                            data-testid="button-copy-category"
-                          >
-                            {productData.category}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                    <Badge variant="secondary" className="text-xs">
-                      <Check className="h-3 w-3 ml-1" />
-                      تم التحليل
-                    </Badge>
-                  </div>
-                </div>
-
-                <div className="p-6 grid gap-4 lg:grid-cols-2">
-                  <div className="space-y-4">
-                    <h4 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
-                      <Barcode className="h-4 w-4" />
-                      معلومات المنتج
-                    </h4>
-                    
-                    <button 
-                      type="button"
-                      className="w-full flex items-center justify-between gap-3 p-4 rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors text-right"
-                      onClick={() => handleCopyText(productData.sku_barcode, "الباركود")}
-                      title="انقر للنسخ"
-                      data-testid="button-copy-sku"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs text-muted-foreground mb-1">الباركود / SKU</p>
-                        <p className="font-mono text-base font-semibold" data-testid="text-sku">
-                          {productData.sku_barcode}
-                        </p>
-                      </div>
-                      <Copy className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                    </button>
-
-                    {productData.seo_title && (
-                      <button 
-                        type="button"
-                        className="w-full flex items-center justify-between gap-3 p-4 rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors text-right"
-                        onClick={() => handleCopyText(productData.seo_title || "", "عنوان SEO")}
-                        title="انقر للنسخ"
-                        data-testid="button-copy-seo-title"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs text-muted-foreground mb-1">عنوان SEO</p>
-                          <p className="text-sm font-medium font-arabic">
-                            {productData.seo_title}
-                          </p>
-                        </div>
-                        <Copy className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                      </button>
-                    )}
-
-                    {productData.product_image_url && (
-                      <div className="p-4 rounded-lg border space-y-3">
-                        <p className="text-xs text-muted-foreground">رابط صورة المنتج</p>
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="flex-1 text-xs gap-1"
-                            onClick={handleCopyImageUrl}
-                            aria-label="نسخ رابط الصورة"
-                            data-testid="button-copy-image-url"
-                          >
-                            {copiedUrl ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                            {copiedUrl ? "تم النسخ" : "نسخ الرابط"}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="gap-1 text-xs"
-                            onClick={() => window.open(productData.product_image_url, "_blank")}
-                            aria-label="فتح الصورة في نافذة جديدة"
-                            data-testid="button-open-image"
-                          >
-                            <ExternalLink className="h-3 w-3" />
-                            فتح
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="space-y-3">
-                    <div className="w-48 h-48 lg:w-64 lg:h-64 rounded-lg bg-white border overflow-hidden mx-auto relative group">
+                <div className="p-6">
+                  <div className="flex flex-col items-center gap-4">
+                    <div className="w-64 h-64 rounded-lg bg-white border-2 overflow-hidden relative group shadow-sm">
                       {productData.product_image_url ? (
                         <img
                           src={productData.product_image_url}
@@ -408,26 +278,22 @@ export default function Home() {
                           className="w-full h-full object-contain"
                           data-testid="img-product"
                           onError={(e) => {
-                            if (frontImageBase64) {
-                              e.currentTarget.src = `data:image/jpeg;base64,${frontImageBase64}`;
-                            }
+                            // Hide broken image, show placeholder
+                            e.currentTarget.style.display = 'none';
+                            const placeholder = e.currentTarget.nextElementSibling;
+                            if (placeholder) placeholder.classList.remove('hidden');
                           }}
                         />
-                      ) : frontImageBase64 ? (
-                        <img
-                          src={`data:image/jpeg;base64,${frontImageBase64}`}
-                          alt={productData.product_name}
-                          className="w-full h-full object-contain"
-                          data-testid="img-product"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-muted">
-                          <Package className="h-12 w-12 text-muted-foreground" />
-                        </div>
-                      )}
+                      ) : null}
+                      <div className={`w-full h-full flex flex-col items-center justify-center bg-muted ${productData.product_image_url ? 'hidden' : ''}`}>
+                        <Package className="h-16 w-16 text-muted-foreground mb-2" />
+                        <p className="text-xs text-muted-foreground text-center px-4">
+                          لم يتم العثور على صورة رسمية
+                        </p>
+                      </div>
                       {productData.product_image_url && (
-                        <div className="absolute bottom-0 left-0 right-0 p-2 bg-background/90 backdrop-blur-sm opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
-                          <div className="flex gap-1">
+                        <div className="absolute bottom-0 left-0 right-0 p-2 bg-background/95 backdrop-blur-sm opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
+                          <div className="flex gap-2">
                             <Button
                               size="sm"
                               variant="outline"
@@ -452,48 +318,160 @@ export default function Home() {
                         </div>
                       )}
                     </div>
+                    {productData.product_image_url && (
+                      <p className="text-xs text-muted-foreground">صورة من المصدر الرسمي</p>
+                    )}
                   </div>
                 </div>
               </Card>
 
-              <Card>
-                <div className="p-6 space-y-4">
-                  <h4 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
-                    الوصف التسويقي
-                  </h4>
-                  <button 
-                    type="button"
-                    className="w-full p-4 rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors text-right"
-                    onClick={() => handleCopyText(productData.marketing_description, "الوصف التسويقي")}
-                    title="انقر للنسخ"
-                    data-testid="button-copy-marketing-desc"
-                  >
-                    <p className="text-sm font-arabic leading-relaxed whitespace-pre-wrap">
-                      {productData.marketing_description}
+              {/* Product Info Grid */}
+              <div className="grid gap-3 md:grid-cols-2">
+                {/* Product Name */}
+                <button 
+                  type="button"
+                  className="md:col-span-2 flex items-center justify-between gap-3 p-4 rounded-lg border bg-card cursor-pointer hover:bg-muted/50 transition-colors text-right"
+                  onClick={() => handleCopyText(productData.product_name, "اسم المنتج")}
+                  title="انقر للنسخ"
+                  data-testid="button-copy-product-name"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs text-muted-foreground mb-1">اسم المنتج</p>
+                    <p className="text-lg font-bold font-arabic" data-testid="text-product-name">
+                      {productData.product_name}
                     </p>
-                  </button>
-                </div>
+                  </div>
+                  <Copy className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                </button>
+
+                {/* Brand */}
+                <button 
+                  type="button"
+                  className="flex items-center justify-between gap-3 p-4 rounded-lg border bg-card cursor-pointer hover:bg-muted/50 transition-colors text-right"
+                  onClick={() => handleCopyText(productData.brand, "الماركة")}
+                  title="انقر للنسخ"
+                  data-testid="button-copy-brand"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs text-muted-foreground mb-1">الماركة</p>
+                    <p className="text-base font-semibold font-arabic" data-testid="text-brand">
+                      {productData.brand}
+                    </p>
+                  </div>
+                  <Copy className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                </button>
+
+                {/* Category */}
+                <button 
+                  type="button"
+                  className="flex items-center justify-between gap-3 p-4 rounded-lg border bg-card cursor-pointer hover:bg-muted/50 transition-colors text-right"
+                  onClick={() => handleCopyText(productData.category, "التصنيف")}
+                  title="انقر للنسخ"
+                  data-testid="button-copy-category"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs text-muted-foreground mb-1">التصنيف</p>
+                    <p className="text-base font-semibold font-arabic" data-testid="text-category">
+                      {productData.category}
+                    </p>
+                  </div>
+                  <Copy className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                </button>
+
+                {/* Barcode/SKU */}
+                <button 
+                  type="button"
+                  className="flex items-center justify-between gap-3 p-4 rounded-lg border bg-card cursor-pointer hover:bg-muted/50 transition-colors text-right"
+                  onClick={() => handleCopyText(productData.sku_barcode, "الباركود")}
+                  title="انقر للنسخ"
+                  data-testid="button-copy-sku"
+                >
+                  <div className="min-w-0 flex-1 flex items-center gap-2">
+                    <Barcode className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">الباركود / SKU</p>
+                      <p className="font-mono text-base font-bold" data-testid="text-sku">
+                        {productData.sku_barcode}
+                      </p>
+                    </div>
+                  </div>
+                  <Copy className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                </button>
+
+                {/* Image URL */}
+                {productData.product_image_url && (
+                  <div className="p-4 rounded-lg border bg-card">
+                    <p className="text-xs text-muted-foreground mb-2">رابط الصورة</p>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1 text-xs gap-1"
+                        onClick={handleCopyImageUrl}
+                        aria-label="نسخ رابط الصورة"
+                        data-testid="button-copy-image-url"
+                      >
+                        {copiedUrl ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                        {copiedUrl ? "تم النسخ" : "نسخ الرابط"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1 text-xs"
+                        onClick={() => window.open(productData.product_image_url, "_blank")}
+                        aria-label="فتح الصورة"
+                        data-testid="button-open-image"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        فتح
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Marketing Description */}
+              <Card>
+                <button 
+                  type="button"
+                  className="w-full p-5 cursor-pointer hover:bg-muted/30 transition-colors text-right"
+                  onClick={() => handleCopyText(productData.marketing_description, "الوصف التسويقي")}
+                  title="انقر للنسخ"
+                  data-testid="button-copy-marketing-desc"
+                >
+                  <div className="flex items-center justify-between gap-3 mb-3">
+                    <h4 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
+                      <FileText className="h-4 w-4" />
+                      الوصف التسويقي
+                    </h4>
+                    <Copy className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <p className="text-sm font-arabic leading-relaxed whitespace-pre-wrap">
+                    {productData.marketing_description}
+                  </p>
+                </button>
               </Card>
 
+              {/* Full Description */}
               <Card>
-                <div className="p-6 space-y-4">
-                  <h4 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
-                    <Package className="h-4 w-4" />
-                    الوصف الكامل
-                  </h4>
-                  <button 
-                    type="button"
-                    className="w-full p-4 rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors text-right max-h-96 overflow-y-auto"
-                    onClick={() => handleCopyText(productData.full_description, "الوصف الكامل")}
-                    title="انقر للنسخ"
-                    data-testid="button-copy-full-desc"
-                  >
-                    <p className="text-sm font-arabic leading-relaxed whitespace-pre-wrap">
-                      {productData.full_description}
-                    </p>
-                  </button>
-                </div>
+                <button 
+                  type="button"
+                  className="w-full p-5 cursor-pointer hover:bg-muted/30 transition-colors text-right max-h-[400px] overflow-y-auto"
+                  onClick={() => handleCopyText(productData.full_description, "الوصف الكامل")}
+                  title="انقر للنسخ"
+                  data-testid="button-copy-full-desc"
+                >
+                  <div className="flex items-center justify-between gap-3 mb-3">
+                    <h4 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
+                      <Package className="h-4 w-4" />
+                      الوصف الكامل
+                    </h4>
+                    <Copy className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <p className="text-sm font-arabic leading-relaxed whitespace-pre-wrap">
+                    {productData.full_description}
+                  </p>
+                </button>
               </Card>
 
               <div className="flex justify-center gap-4 flex-wrap">
