@@ -43,22 +43,6 @@ const smartAnalysisPrompt = `**أنت ثلاثة خبراء في شخص واحد
 
 ---
 
-## 🖼️ المرحلة الرابعة: البحث عن صور المنتج
-
-### Image Verification:
-- ابحث عن 3-5 روابط صور رسمية للمنتج من مصادر موثوقة:
-  - موقع الشركة المصنعة الرسمي
-  - gsmarena.com (للهواتف)
-  - amazon.com / noon.com
-  - مواقع التجارة الإلكترونية الكبرى
-- تأكد أن الصور:
-  - بخلفية بيضاء أو شفافة
-  - بدون علامات مائية
-  - بجودة عالية (PNG/JPG)
-  - تظهر المنتج بوضوح
-
----
-
 ## 📱 للهواتف والتابلت - وصف مفصل:
 
 ### الوصف التسويقي (50-100 كلمة):
@@ -85,8 +69,7 @@ const smartAnalysisPrompt = `**أنت ثلاثة خبراء في شخص واحد
   "full_description": "وصف شامل 200-500 كلمة: المواصفات التفصيلية، محتويات العلبة، نسخة الشرق الأوسط",
   "category": "التصنيف (هواتف ذكية / تابلت / سماعات / أجهزة منزلية)",
   "brand": "اسم الماركة بالعربي",
-  "sku_barcode": "الباركود (GTIN/EAN/UPC 12-13 رقم) أو رقم الموديل (MPN)",
-  "product_image_url": "رابط صورة رسمية من موقع الشركة أو gsmarena (PNG/JPG، خلفية بيضاء، بدون علامات مائية)"
+  "sku_barcode": "الباركود (GTIN/EAN/UPC 12-13 رقم) أو رقم الموديل (MPN)"
 }
 
 ---
@@ -101,8 +84,7 @@ const smartAnalysisPrompt = `**أنت ثلاثة خبراء في شخص واحد
 2. **لا تترك أي حقل فارغ**
 3. **الأولوية للباركود (GTIN)**
 4. **أجب بـ JSON فقط** - بدون markdown
-5. **تحقق من رابط الصورة قبل إضافته**
-6. **ممنوع الفيسات التعبيرية**
+5. **ممنوع الفيسات التعبيرية**
 
 ---
 
@@ -202,6 +184,31 @@ export async function registerRoutes(
           success: false,
           error: "Failed to parse AI response",
         });
+      }
+
+      // Upload the processed front image to imgbb for a permanent URL
+      const imgbbApiKey = process.env.IMGBB_API_KEY;
+      if (imgbbApiKey) {
+        try {
+          const formData = new URLSearchParams();
+          formData.append("key", imgbbApiKey);
+          formData.append("image", processedFrontBase64);
+
+          const imgbbResponse = await fetch("https://api.imgbb.com/1/upload", {
+            method: "POST",
+            body: formData,
+          });
+
+          if (imgbbResponse.ok) {
+            const imgbbResult = await imgbbResponse.json();
+            if (imgbbResult.success && imgbbResult.data?.url) {
+              productData.product_image_url = imgbbResult.data.url;
+            }
+          }
+        } catch (imgbbError) {
+          console.error("imgbb upload failed:", imgbbError);
+          // Continue without uploaded image URL - will use base64 fallback
+        }
       }
 
       return res.json({

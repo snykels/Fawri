@@ -144,15 +144,36 @@ export function ImageUploadCard({
               className="w-full h-64 object-contain"
               data-testid={`${testId}-preview`}
             />
-            <Button
-              size="icon"
-              variant="destructive"
-              className="absolute top-2 right-2"
-              onClick={handleRemove}
-              data-testid={`${testId}-remove`}
-            >
-              <X className="h-4 w-4" />
-            </Button>
+            <div className="absolute top-2 right-2 flex gap-1">
+              <label htmlFor={`${testId}-reupload`}>
+                <Button
+                  size="icon"
+                  variant="secondary"
+                  className="cursor-pointer"
+                  asChild
+                >
+                  <span>
+                    <Upload className="h-4 w-4" />
+                  </span>
+                </Button>
+                <input
+                  id={`${testId}-reupload`}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileInput}
+                  className="hidden"
+                  data-testid={`${testId}-reupload`}
+                />
+              </label>
+              <Button
+                size="icon"
+                variant="destructive"
+                onClick={handleRemove}
+                data-testid={`${testId}-remove`}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
             <div className="absolute bottom-0 left-0 right-0 bg-background/90 backdrop-blur-sm p-3">
               <div className="flex items-center gap-2">
                 <ImageIcon className="h-4 w-4 text-muted-foreground" />
