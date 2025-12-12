@@ -51,6 +51,14 @@ export default function Home() {
     }
   };
 
+  const handleCopyText = async (text: string, label: string) => {
+    await navigator.clipboard.writeText(text);
+    toast({
+      title: "تم النسخ",
+      description: `تم نسخ ${label}`,
+    });
+  };
+
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -311,21 +319,38 @@ export default function Home() {
                       <div className="flex items-start justify-between gap-4 flex-wrap">
                         <div className="space-y-1">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <Badge variant="secondary" className="text-xs">
+                            <Badge 
+                              variant="secondary" 
+                              className="text-xs cursor-pointer"
+                              onClick={() => handleCopyText(productData.brand, "الماركة")}
+                            >
                               {productData.brand}
                             </Badge>
-                            <Badge variant="outline" className="text-xs">
+                            <Badge 
+                              variant="outline" 
+                              className="text-xs cursor-pointer"
+                              onClick={() => handleCopyText(productData.category, "التصنيف")}
+                            >
                               {productData.category}
                             </Badge>
                           </div>
-                          <h3 className="text-xl font-bold font-arabic" data-testid="text-product-name">
+                          <h3 
+                            className="text-xl font-bold font-arabic cursor-pointer hover:text-primary transition-colors" 
+                            data-testid="text-product-name"
+                            onClick={() => handleCopyText(productData.product_name, "اسم المنتج")}
+                            title="انقر للنسخ"
+                          >
                             {productData.product_name}
                           </h3>
                         </div>
                       </div>
 
                       <div className="grid gap-3 sm:grid-cols-2">
-                        <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
+                        <div 
+                          className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 cursor-pointer hover:bg-muted transition-colors"
+                          onClick={() => handleCopyText(productData.sku_barcode, "الباركود")}
+                          title="انقر للنسخ"
+                        >
                           <Barcode className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                           <div className="min-w-0">
                             <p className="text-xs text-muted-foreground">الباركود/SKU</p>
@@ -334,18 +359,26 @@ export default function Home() {
                             </p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
+                        <div 
+                          className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 cursor-pointer hover:bg-muted transition-colors"
+                          onClick={() => handleCopyText(productData.seo_title || "", "عنوان SEO")}
+                          title="انقر للنسخ"
+                        >
                           <Tag className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                           <div className="min-w-0">
                             <p className="text-xs text-muted-foreground">عنوان SEO</p>
                             <p className="text-sm font-medium truncate font-arabic">
-                              {productData.seo_title}
+                              {productData.seo_title || "-"}
                             </p>
                           </div>
                         </div>
                       </div>
 
-                      <div className="space-y-2 p-3 rounded-lg bg-muted/50">
+                      <div 
+                        className="space-y-2 p-3 rounded-lg bg-muted/50 cursor-pointer hover:bg-muted transition-colors"
+                        onClick={() => handleCopyText(productData.marketing_description, "الوصف التسويقي")}
+                        title="انقر للنسخ"
+                      >
                         <div className="flex items-center gap-2">
                           <FileText className="h-4 w-4 text-muted-foreground" />
                           <p className="text-xs text-muted-foreground">الوصف التسويقي</p>
@@ -355,7 +388,11 @@ export default function Home() {
                         </p>
                       </div>
 
-                      <div className="space-y-2 p-3 rounded-lg bg-muted/50">
+                      <div 
+                        className="space-y-2 p-3 rounded-lg bg-muted/50 cursor-pointer hover:bg-muted transition-colors"
+                        onClick={() => handleCopyText(productData.full_description, "الوصف الكامل")}
+                        title="انقر للنسخ"
+                      >
                         <div className="flex items-center gap-2">
                           <Package className="h-4 w-4 text-muted-foreground" />
                           <p className="text-xs text-muted-foreground">الوصف الكامل</p>
