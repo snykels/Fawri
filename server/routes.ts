@@ -293,6 +293,40 @@ export async function registerRoutes(
           if (!isTrusted) {
             console.log("Rejected untrusted image URL:", productData.product_image_url);
             productData.product_image_url = "";
+          } else {
+            // Verify the image URL is actually accessible and returns an image
+            try {
+              console.log("Verifying image URL:", productData.product_image_url);
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+              
+              const imageResponse = await fetch(productData.product_image_url, {
+                method: "HEAD",
+                signal: controller.signal,
+                headers: {
+                  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                  "Accept": "image/*,*/*;q=0.8",
+                },
+              });
+              
+              clearTimeout(timeoutId);
+              
+              if (!imageResponse.ok) {
+                console.log("Image URL not accessible (status:", imageResponse.status, "):", productData.product_image_url);
+                productData.product_image_url = "";
+              } else {
+                const contentType = imageResponse.headers.get("content-type") || "";
+                if (!contentType.startsWith("image/")) {
+                  console.log("URL does not return an image (content-type:", contentType, "):", productData.product_image_url);
+                  productData.product_image_url = "";
+                } else {
+                  console.log("Image URL verified successfully:", productData.product_image_url);
+                }
+              }
+            } catch (fetchError: any) {
+              console.log("Failed to verify image URL:", fetchError.message, productData.product_image_url);
+              productData.product_image_url = "";
+            }
           }
         } catch {
           // Invalid URL format
