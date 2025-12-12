@@ -288,13 +288,14 @@ export default function Home() {
                           </div>
                         )}
                         {productData.product_image_url && (
-                          <div className="absolute bottom-0 left-0 right-0 p-2 bg-background/90 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="absolute bottom-0 left-0 right-0 p-2 bg-background/90 backdrop-blur-sm opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
                             <div className="flex gap-1">
                               <Button
                                 size="sm"
                                 variant="outline"
                                 className="flex-1 text-xs gap-1"
                                 onClick={handleCopyImageUrl}
+                                aria-label="نسخ رابط الصورة"
                                 data-testid="button-copy-image-url"
                               >
                                 {copiedUrl ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
@@ -303,8 +304,8 @@ export default function Home() {
                               <Button
                                 size="icon"
                                 variant="outline"
-                                className="h-8 w-8"
                                 onClick={() => window.open(productData.product_image_url, "_blank")}
+                                aria-label="فتح الصورة في نافذة جديدة"
                                 data-testid="button-open-image"
                               >
                                 <ExternalLink className="h-3 w-3" />
@@ -319,37 +320,44 @@ export default function Home() {
                       <div className="flex items-start justify-between gap-4 flex-wrap">
                         <div className="space-y-1">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <Badge 
-                              variant="secondary" 
-                              className="text-xs cursor-pointer"
+                            <button 
+                              type="button"
+                              className="inline-flex items-center rounded-md border border-transparent bg-secondary px-2.5 py-0.5 text-xs font-semibold text-secondary-foreground cursor-pointer hover:bg-secondary/80 transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                               onClick={() => handleCopyText(productData.brand, "الماركة")}
+                              aria-label={`نسخ الماركة: ${productData.brand}`}
+                              data-testid="button-copy-brand"
                             >
                               {productData.brand}
-                            </Badge>
-                            <Badge 
-                              variant="outline" 
-                              className="text-xs cursor-pointer"
+                            </button>
+                            <button 
+                              type="button"
+                              className="inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold cursor-pointer hover:bg-accent transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                               onClick={() => handleCopyText(productData.category, "التصنيف")}
+                              aria-label={`نسخ التصنيف: ${productData.category}`}
+                              data-testid="button-copy-category"
                             >
                               {productData.category}
-                            </Badge>
+                            </button>
                           </div>
-                          <h3 
-                            className="text-xl font-bold font-arabic cursor-pointer hover:text-primary transition-colors" 
-                            data-testid="text-product-name"
+                          <button
+                            type="button" 
+                            className="text-xl font-bold font-arabic cursor-pointer hover:text-primary transition-colors text-right w-full" 
+                            data-testid="button-copy-product-name"
                             onClick={() => handleCopyText(productData.product_name, "اسم المنتج")}
                             title="انقر للنسخ"
                           >
                             {productData.product_name}
-                          </h3>
+                          </button>
                         </div>
                       </div>
 
                       <div className="grid gap-3 sm:grid-cols-2">
-                        <div 
-                          className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 cursor-pointer hover:bg-muted transition-colors"
+                        <button 
+                          type="button"
+                          className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 cursor-pointer hover:bg-muted transition-colors text-right"
                           onClick={() => handleCopyText(productData.sku_barcode, "الباركود")}
                           title="انقر للنسخ"
+                          data-testid="button-copy-sku"
                         >
                           <Barcode className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                           <div className="min-w-0">
@@ -358,11 +366,13 @@ export default function Home() {
                               {productData.sku_barcode}
                             </p>
                           </div>
-                        </div>
-                        <div 
-                          className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 cursor-pointer hover:bg-muted transition-colors"
+                        </button>
+                        <button 
+                          type="button"
+                          className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 cursor-pointer hover:bg-muted transition-colors text-right"
                           onClick={() => handleCopyText(productData.seo_title || "", "عنوان SEO")}
                           title="انقر للنسخ"
+                          data-testid="button-copy-seo-title"
                         >
                           <Tag className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                           <div className="min-w-0">
@@ -371,13 +381,15 @@ export default function Home() {
                               {productData.seo_title || "-"}
                             </p>
                           </div>
-                        </div>
+                        </button>
                       </div>
 
-                      <div 
-                        className="space-y-2 p-3 rounded-lg bg-muted/50 cursor-pointer hover:bg-muted transition-colors"
+                      <button 
+                        type="button"
+                        className="w-full space-y-2 p-3 rounded-lg bg-muted/50 cursor-pointer hover:bg-muted transition-colors text-right"
                         onClick={() => handleCopyText(productData.marketing_description, "الوصف التسويقي")}
                         title="انقر للنسخ"
+                        data-testid="button-copy-marketing-desc"
                       >
                         <div className="flex items-center gap-2">
                           <FileText className="h-4 w-4 text-muted-foreground" />
@@ -386,12 +398,14 @@ export default function Home() {
                         <p className="text-sm font-arabic leading-relaxed">
                           {productData.marketing_description}
                         </p>
-                      </div>
+                      </button>
 
-                      <div 
-                        className="space-y-2 p-3 rounded-lg bg-muted/50 cursor-pointer hover:bg-muted transition-colors"
+                      <button 
+                        type="button"
+                        className="w-full space-y-2 p-3 rounded-lg bg-muted/50 cursor-pointer hover:bg-muted transition-colors text-right"
                         onClick={() => handleCopyText(productData.full_description, "الوصف الكامل")}
                         title="انقر للنسخ"
+                        data-testid="button-copy-full-desc"
                       >
                         <div className="flex items-center gap-2">
                           <Package className="h-4 w-4 text-muted-foreground" />
@@ -400,7 +414,7 @@ export default function Home() {
                         <p className="text-sm font-arabic leading-relaxed">
                           {productData.full_description}
                         </p>
-                      </div>
+                      </button>
                     </div>
                   </div>
                 </div>

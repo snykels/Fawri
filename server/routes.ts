@@ -387,5 +387,233 @@ export async function registerRoutes(
     }
   });
 
+  // Upload image to imgbb and return permanent URL
+  app.post("/api/upload-image", async (req, res) => {
+    try {
+      const { imageBase64 } = req.body;
+
+      if (!imageBase64) {
+        return res.status(400).json({
+          success: false,
+          error: "Image is required",
+        });
+      }
+
+      // Remove base64 prefix first for accurate size calculation
+      const cleanBase64ForSize = imageBase64.replace(/^data:image\/\w+;base64,/, "");
+      
+      // Decode base64 and check actual binary size
+      let decodedBuffer: Buffer;
+      try {
+        decodedBuffer = Buffer.from(cleanBase64ForSize, "base64");
+      } catch {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid image data",
+        });
+      }
+      
+      const maxSize = 10 * 1024 * 1024; // 10MB
+      if (decodedBuffer.length > maxSize) {
+        return res.status(400).json({
+          success: false,
+          error: "Image too large (max 10MB)",
+        });
+      }
+
+      const imgbbApiKey = process.env.IMGBB_API_KEY;
+      if (!imgbbApiKey) {
+        return res.status(500).json({
+          success: false,
+          error: "Image upload service not configured",
+        });
+      }
+
+      // Remove base64 prefix if present
+      const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, "");
+
+      // Prepare form data for imgbb API
+      const formData = new URLSearchParams();
+      formData.append("key", imgbbApiKey);
+      formData.append("image", cleanBase64);
+
+      const response = await fetch("https://api.imgbb.com/1/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        console.error("imgbb HTTP error:", response.status);
+        return res.status(500).json({
+          success: false,
+          error: "Image upload service temporarily unavailable",
+        });
+      }
+
+      const result = await response.json();
+
+      if (!result.success) {
+        console.error("imgbb upload error:", result);
+        return res.status(500).json({
+          success: false,
+          error: "Failed to upload image",
+        });
+      }
+
+      return res.json({
+        success: true,
+        url: result.data.url,
+        display_url: result.data.display_url,
+      });
+    } catch (error: any) {
+      console.error("Image upload error:", error);
+      return res.status(500).json({
+        success: false,
+        error: "Image upload failed",
+      });
+    }
+  });
+
+  // Verify if an image URL is accessible (restricted to trusted domains)
+  app.post("/api/verify-image-url", async (req, res) => {
+    try {
+      const { url } = req.body;
+
+      if (!url || typeof url !== "string") {
+        return res.status(400).json({
+          success: false,
+          valid: false,
+          error: "URL is required",
+        });
+      }
+
+      // Validate URL format
+      let parsedUrl: URL;
+      try {
+        parsedUrl = new URL(url);
+      } catch {
+        return res.json({
+          success: false,
+          valid: false,
+          reason: "Invalid URL format",
+        });
+      }
+
+      // Only allow HTTPS and trusted domains to prevent SSRF
+      const trustedDomains = [
+        "gsmarena.com",
+        "fdn.gsmarena.com",
+        "amazon.com",
+        "m.media-amazon.com",
+        "images-na.ssl-images-amazon.com",
+        "noon.com",
+        "f.nooncdn.com",
+        "samsung.com",
+        "images.samsung.com",
+        "apple.com",
+        "store.storeimages.cdn-apple.com",
+        "xiaomi.com",
+        "i01.appmifile.com",
+        "oppo.com",
+        "image.oppo.com",
+        "vivo.com",
+        "realme.com",
+        "infinixmobility.com",
+        "tecno-mobile.com",
+        "imgbb.com",
+        "i.ibb.co",
+      ];
+
+      const hostname = parsedUrl.hostname.toLowerCase();
+      const isTrusted = trustedDomains.some(
+        (domain) => hostname === domain || hostname.endsWith("." + domain)
+      );
+
+      if (parsedUrl.protocol !== "https:" || !isTrusted) {
+        return res.json({
+          success: false,
+          valid: false,
+          reason: "URL not from trusted source",
+        });
+      }
+
+      // DNS lookup to prevent SSRF via DNS rebinding to private IPs
+      const dns = await import("dns").then(m => m.promises);
+      try {
+        const addresses = await dns.lookup(hostname, { all: true });
+        const privateIPRanges = [
+          /^127\./,                    // Loopback
+          /^10\./,                     // Private Class A
+          /^172\.(1[6-9]|2[0-9]|3[01])\./, // Private Class B
+          /^192\.168\./,               // Private Class C
+          /^169\.254\./,               // Link-local
+          /^0\./,                      // Current network
+          /^::1$/,                     // IPv6 loopback
+          /^fe80:/i,                   // IPv6 link-local
+          /^fc00:/i,                   // IPv6 unique local
+          /^fd/i,                      // IPv6 unique local
+        ];
+        
+        const hasPrivateIP = addresses.some((addr: { address: string }) => 
+          privateIPRanges.some(range => range.test(addr.address))
+        );
+        
+        if (hasPrivateIP) {
+          return res.json({
+            success: false,
+            valid: false,
+            reason: "URL resolves to private network",
+          });
+        }
+      } catch (dnsError) {
+        return res.json({
+          success: false,
+          valid: false,
+          reason: "DNS lookup failed",
+        });
+      }
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+
+      try {
+        const response = await fetch(url, { 
+          method: "HEAD",
+          signal: controller.signal,
+        });
+        clearTimeout(timeout);
+
+        const contentType = response.headers.get("content-type") || "";
+
+        if (response.ok && contentType.startsWith("image/")) {
+          return res.json({
+            success: true,
+            valid: true,
+            contentType,
+          });
+        }
+
+        return res.json({
+          success: false,
+          valid: false,
+          reason: response.ok ? "Not an image" : `HTTP ${response.status}`,
+        });
+      } catch (fetchError: any) {
+        clearTimeout(timeout);
+        return res.json({
+          success: false,
+          valid: false,
+          reason: fetchError.name === "AbortError" ? "Request timeout" : "URL not accessible",
+        });
+      }
+    } catch (error: any) {
+      return res.json({
+        success: false,
+        valid: false,
+        reason: "Verification failed",
+      });
+    }
+  });
+
   return httpServer;
 }
