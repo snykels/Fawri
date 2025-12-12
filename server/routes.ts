@@ -43,21 +43,31 @@ const smartAnalysisPrompt = `**أنت ثلاثة خبراء في شخص واحد
 
 ---
 
-## 🖼️ المرحلة الرابعة: البحث عن صورة احترافية
+## 🖼️ المرحلة الرابعة: البحث عن صورة احترافية (Google Lens Style)
 
-### مهم جداً - ابحث عن صورة المنتج الرسمية:
-بعد تحديد المنتج، ابحث عن صورة احترافية من المصادر التالية بالترتيب:
+### مهم جداً - ابحث عن صورة المنتج مثل Google Lens:
+بعد تحديد المنتج، تخيل أنك تستخدم Google Lens للبحث عن صور المنتج:
 
-1. **الموقع الرسمي للشركة المصنعة** (samsung.com, apple.com, xiaomi.com, etc.)
-2. **GSMArena** للهواتف والتابلت (fdn.gsmarena.com)
-3. **Amazon** (m.media-amazon.com, images-na.ssl-images-amazon.com)
-4. **Noon** (f.nooncdn.com)
+#### خطوات البحث (مثل Google Lens → Google Shopping):
+1. استخدم اسم المنتج الكامل (Brand + Model + Variant) للبحث
+2. ابحث في "Google Shopping" عن المنتج - ستجد صور احترافية من المتاجر
+3. اختر أفضل صورة من المنتجات المطابقة
+
+#### المصادر بالترتيب (حسب الأولوية):
+1. **Google Shopping / المتاجر الإلكترونية** - تظهر صور احترافية للمنتجات
+2. **الموقع الرسمي للشركة المصنعة** (samsung.com, apple.com, xiaomi.com, huawei.com, oppo.com, brave.com.sa, etc.)
+3. **GSMArena** للهواتف والتابلت (fdn.gsmarena.com, cdn.gsmarena.com)
+4. **Amazon** (m.media-amazon.com, images-na.ssl-images-amazon.com)
+5. **Noon** (f.nooncdn.com)
+6. **AliExpress** (ae01.alicdn.com)
+7. **المتاجر السعودية** (jarir.com, extra.com, sharafdg.com)
 
 ### متطلبات الصورة:
 - يجب أن تكون HTTPS
 - يجب أن تكون صورة واضحة للمنتج على خلفية بيضاء أو شفافة
 - يجب أن تطابق اللون والموديل المحدد
 - يفضل الصور عالية الجودة (PNG أو JPG)
+- **الأفضل: صورة المنتج فقط بدون العلبة أو الإكسسوارات**
 
 ---
 
@@ -223,6 +233,7 @@ export async function registerRoutes(
           "gsmarena.com",
           "fdn.gsmarena.com",
           "fdn2.gsmarena.com",
+          "cdn.gsmarena.com",
           "amazon.com",
           "m.media-amazon.com",
           "images-na.ssl-images-amazon.com",
@@ -247,6 +258,30 @@ export async function registerRoutes(
           "opc.img.shopping.com",
           "cdn.shopify.com",
           "static.wixstatic.com",
+          "aliexpress.com",
+          "ae01.alicdn.com",
+          "ae02.alicdn.com",
+          "ae03.alicdn.com",
+          "alicdn.com",
+          "jarir.com",
+          "extra.com",
+          "sharafdg.com",
+          "brave.com.sa",
+          "huawei.com",
+          "consumer.huawei.com",
+          "img.huaweicloud.com",
+          "honor.com",
+          "hihonor.com",
+          "motorola.com",
+          "nokia.com",
+          "sony.com",
+          "lg.com",
+          "lenovo.com",
+          "asus.com",
+          "anker.com",
+          "jbl.com",
+          "harmankardon.com",
+          "bose.com",
         ];
 
         try {
@@ -564,23 +599,55 @@ export async function registerRoutes(
       const trustedDomains = [
         "gsmarena.com",
         "fdn.gsmarena.com",
+        "fdn2.gsmarena.com",
+        "cdn.gsmarena.com",
         "amazon.com",
         "m.media-amazon.com",
         "images-na.ssl-images-amazon.com",
+        "images-eu.ssl-images-amazon.com",
         "noon.com",
         "f.nooncdn.com",
         "samsung.com",
         "images.samsung.com",
+        "image-us.samsung.com",
         "apple.com",
         "store.storeimages.cdn-apple.com",
         "xiaomi.com",
         "i01.appmifile.com",
+        "i02.appmifile.com",
         "oppo.com",
         "image.oppo.com",
         "vivo.com",
         "realme.com",
         "infinixmobility.com",
         "tecno-mobile.com",
+        "oneplus.com",
+        "opc.img.shopping.com",
+        "cdn.shopify.com",
+        "static.wixstatic.com",
+        "aliexpress.com",
+        "ae01.alicdn.com",
+        "ae02.alicdn.com",
+        "ae03.alicdn.com",
+        "alicdn.com",
+        "jarir.com",
+        "extra.com",
+        "sharafdg.com",
+        "huawei.com",
+        "consumer.huawei.com",
+        "img.huaweicloud.com",
+        "honor.com",
+        "hihonor.com",
+        "motorola.com",
+        "nokia.com",
+        "sony.com",
+        "lg.com",
+        "lenovo.com",
+        "asus.com",
+        "anker.com",
+        "jbl.com",
+        "harmankardon.com",
+        "bose.com",
         "imgbb.com",
         "i.ibb.co",
       ];
