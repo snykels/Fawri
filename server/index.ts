@@ -8,8 +8,8 @@ import path from "path";
 // Manually load .env file
 console.log("APP STARTING...");
 
-// Hardcoded absolute path for Hostinger environment
-const APP_ROOT = "/home/u551247625/domains/bisque-elk-518078.hostingersite.com/nodejs";
+// Hardcoded persistent absolute path for Hostinger environment
+const APP_ROOT = "/home/u551247625/fawri_data";
 const envPath = path.resolve(APP_ROOT, ".env");
 
 if (fs.existsSync(envPath)) {
