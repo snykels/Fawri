@@ -6,8 +6,12 @@ import fs from "fs";
 import path from "path";
 
 // Manually load .env file
+console.log("APP STARTING - CWD:", process.cwd());
+console.log("DIRNAME:", __dirname);
+
 const envPath = path.resolve(process.cwd(), ".env");
 if (fs.existsSync(envPath)) {
+  console.log("Loading .env from:", envPath);
   const envConfig = fs.readFileSync(envPath, "utf-8");
   envConfig.split("\n").forEach((line) => {
     const match = line.match(/^([^=]+)=(.*)$/);
@@ -17,10 +21,13 @@ if (fs.existsSync(envPath)) {
       process.env[key] = value;
     }
   });
+} else {
+  console.log(".env NOT FOUND at:", envPath);
 }
 
 // Manual database initialization for production environments
 const dbPath = path.resolve(process.cwd(), "sqlite.db");
+console.log("Initializing database at:", dbPath);
 const sqlite = new (await import("better-sqlite3")).default(dbPath);
 
 sqlite.exec(`
