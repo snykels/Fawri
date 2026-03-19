@@ -11,7 +11,10 @@ import { db } from "./db";
 import { uploadedProducts, sallaTokens } from "@shared/schema";
 import { eq, desc } from "drizzle-orm";
 import session from "express-session";
+import createMemoryStore from "memorystore";
 import crypto from "crypto";
+
+const MemoryStore = createMemoryStore(session);
 
 const smartAnalysisPrompt = `**أنت خبير منتجات ومحترف SEO.**
 مهمتك استخراج بيانات المنتج بدقة 100% من الصور والنصوص (OCR).
@@ -297,12 +300,15 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
 
-  // Simple session setup for admin
+  // Production-ready session setup for admin
   app.use(session({
-    secret: "salla-admin-secret",
+    cookie: { maxAge: 86400000, secure: false },
+    store: new MemoryStore({
+      checkPeriod: 86400000 // prune expired entries every 24h
+    }),
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 }
+    secret: "salla-admin-secret"
   }));
 
   // Create uploads dir
