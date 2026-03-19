@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useLanguage } from "@/lib/language-provider";
 import {
   Loader2,
   Download,
@@ -21,7 +22,6 @@ import {
   Copy,
   Check,
   ExternalLink,
-  Languages,
   Search,
 } from "lucide-react";
 import {
@@ -47,7 +47,7 @@ export default function Home() {
   const [productData, setProductData] = useState<ProductData | null>(null);
   const [frontImageBase64, setFrontImageBase64] = useState<string>("");
   const [copiedUrl, setCopiedUrl] = useState(false);
-  const [isEnglish, setIsEnglish] = useState(false);
+  const { isEnglish } = useLanguage();
   const { toast } = useToast();
 
   const [progress, setProgress] = useState(0);
@@ -94,7 +94,7 @@ export default function Home() {
   const generateMutation = useMutation({
     mutationFn: async () => {
       if (!frontImage || !backImage) {
-        throw new Error("Both images are required");
+        throw new Error(isEnglish ? "Both images are required" : "يرجى إرفاق الصورتين معاً");
       }
 
       const [frontBase64, backBase64] = await Promise.all([
@@ -139,7 +139,6 @@ export default function Home() {
       interval = setInterval(() => {
         setProgress((prev) => {
           if (prev >= 95) return prev;
-          // Non-linear progress simulation
           const remaining = 95 - prev;
           const increment = Math.max(0.1, remaining * 0.05);
           return prev + increment;
@@ -256,18 +255,22 @@ export default function Home() {
   const canGenerate = frontImage && backImage;
 
   return (
-    <div className="min-h-screen bg-background transition-colors duration-300 relative overflow-hidden">
+    <div className="min-h-screen bg-background transition-colors duration-300 relative overflow-hidden font-sans">
       <div className="ambient-glow" />
       <Header />
 
       <main className="max-w-6xl mx-auto px-6 py-12 relative z-10">
         <div className="space-y-8">
-          <div className="text-center space-y-4 mb-16">
-            <h2 className="text-4xl md:text-5xl font-extrabold tracking-tight font-arabic leading-tight" dir="rtl">
-              تحليل <span className="italic text-primary">المنتج</span> بذكاء
+          <div className="text-center space-y-4 mb-20 mt-8">
+            <h2 className="text-4xl md:text-6xl font-black tracking-tighter leading-tight italic uppercase">
+              {isEnglish ? "Intelligent" : "تحليل"}{" "}
+              <span className="text-primary">{isEnglish ? "Product" : "المنتج"}</span>{" "}
+              {isEnglish ? "Sense" : "بذكاء"}
             </h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto font-arabic" dir="rtl">
-              ارفع صور المنتج وسيقوم الذكاء الاصطناعي بتحليلها واستخراج البيانات تلقائياً لمنصتي سلة وزد بدقة متناهية
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto font-bold opacity-80 decoration-primary/20 underline-offset-4 decoration-2">
+              {isEnglish 
+                ? "Upload product shots to extract high-accuracy data for Salla & Zid using advanced AI sense." 
+                : "ارفع صور المنتج وسيقوم الذكاء الاصطناعي بتحليلها واستخراج البيانات تلقائياً لمنصتي سلة وزد بدقة متناهية"}
             </p>
           </div>
 
@@ -294,30 +297,30 @@ export default function Home() {
                 />
               </div>
 
-              <div className="flex justify-center mt-12">
+              <div className="flex justify-center mt-12 mb-16">
                 <Button
                   size="lg"
-                  className="bolt-button px-10 py-7 text-xl gap-3 rounded-full bg-primary hover:bg-primary/90 text-white border border-white/20 shadow-[0_0_20px_rgba(20,136,252,0.3)] transition-all duration-300"
+                  className="bolt-button px-12 py-8 text-2xl gap-3 rounded-2xl font-black shadow-2xl shadow-primary/20 hover:scale-[1.02]"
                   disabled={!canGenerate}
                   onClick={() => generateMutation.mutate()}
                   data-testid="button-generate"
                 >
-                  <ScanBarcode className="h-6 w-6" />
-                  تحليل وإضافة المنتج
+                  <ScanBarcode className="h-7 w-7" />
+                  {isEnglish ? "INITIATE ANALYSIS" : "تحليل وإضافة المنتج"}
                 </Button>
               </div>
 
-              <Card className="p-16 glass rounded-[2.5rem] shadow-2xl">
+              <Card className="p-16 glass rounded-[3rem] shadow-2xl border-primary/5">
                 <div className="flex flex-col items-center justify-center text-center space-y-6">
-                  <div className="p-5 rounded-full bg-primary/10 border border-primary/20">
-                    <Upload className="h-10 w-10 text-primary" />
+                  <div className="p-6 rounded-3xl bg-primary/10 border border-primary/20 shadow-inner group transition-transform hover:scale-110">
+                    <Upload className="h-12 w-12 text-primary" />
                   </div>
                   <div className="space-y-3">
-                    <h3 className="text-2xl font-bold font-arabic" dir="rtl">
-                      بانتظار صور المنتج...
+                    <h3 className="text-3xl font-black italic uppercase tracking-tight">
+                      {isEnglish ? "Awaiting Input" : "بانتظار صور المنتج..."}
                     </h3>
-                    <p className="text-muted-foreground max-w-md font-arabic mx-auto" dir="rtl">
-                      ارفع صورة المنتج الأمامية والخلفية لنبدأ السحر
+                    <p className="text-muted-foreground max-w-md font-bold mx-auto opacity-70">
+                      {isEnglish ? "Connect your product shots to begin the data extraction magic." : "ارفع صورة المنتج الأمامية والخلفية لنبدأ السحر"}
                     </p>
                   </div>
                 </div>
@@ -326,421 +329,216 @@ export default function Home() {
           )}
 
           {generateMutation.isPending && (
-            <Card className="p-12">
-              <div className="flex flex-col items-center justify-center text-center space-y-6 max-w-lg mx-auto w-full">
-                <div className="w-full space-y-2">
+            <Card className="p-16 glass border-primary/20 shadow-2xl rounded-[3rem]">
+              <div className="flex flex-col items-center justify-center text-center space-y-8 max-w-lg mx-auto w-full">
+                <div className="w-full space-y-3">
                   <div className="flex justify-between items-center px-1">
-                    <span className="text-sm font-medium text-primary">{Math.round(progress)}%</span>
-                    <span className="text-sm font-medium text-primary font-arabic" dir="rtl">جاري التحليل...</span>
+                    <span className="text-xl font-black text-primary italic uppercase">{Math.round(progress)}%</span>
+                    <span className="text-sm font-bold text-primary uppercase tracking-widest">{isEnglish ? "Analyzing Vision..." : "جاري التحليل..."}</span>
                   </div>
-                  <Progress value={progress} className="h-3 w-full" />
+                  <Progress value={progress} className="h-4 w-full rounded-full bg-primary/10 border border-primary/5 shadow-inner" />
                 </div>
 
                 <div className="space-y-2">
-                  <h3 className="text-lg font-medium font-arabic" dir="rtl">
-                    جاري تحليل المنتج...
+                  <h3 className="text-2xl font-black italic uppercase">
+                    {isEnglish ? "Processing Data" : "جاري تحليل المنتج..."}
                   </h3>
-                  <p className="text-sm text-muted-foreground max-w-md font-arabic" dir="rtl">
-                    يتم استخراج البيانات باستخدام الذكاء الاصطناعي
+                  <p className="text-sm text-muted-foreground max-w-md font-bold opacity-70">
+                    {isEnglish ? "AI is sense-extracting all mandatory catalog fields." : "يتم استخراج البيانات باستخدام الذكاء الاصطناعي"}
                   </p>
                 </div>
+                <Loader2 className="h-10 w-10 animate-spin text-primary opacity-50" />
               </div>
             </Card>
           )}
 
           {productData && !generateMutation.isPending && (
-            <div className="space-y-4" dir={isEnglish ? "ltr" : "rtl"}>
-              {/* Header with status and language toggle */}
+            <div className="space-y-6">
+              {/* Header Status */}
               <div className="flex items-center justify-between gap-4 flex-wrap">
-                <Badge variant="secondary" className="text-xs bg-primary/20 text-primary border-primary/20 px-3 py-1">
-                  <Check className="h-3 w-3 ml-1" />
-                  {isEnglish ? "Analysis Complete" : "تم التحليل بنجاح"}
+                <Badge variant="secondary" className="text-[10px] font-black uppercase tracking-[0.2em] bg-primary/10 text-primary border-primary/20 px-4 py-1.5 rounded-xl">
+                  <Check className="h-3 w-3 mr-1.5" />
+                  {isEnglish ? "Catalog Extract Ready" : "تم التحليل بنجاح"}
                 </Badge>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-2 border-white/10 hover:bg-white/5"
-                  onClick={() => setIsEnglish(!isEnglish)}
-                  data-testid="button-toggle-language"
-                >
-                  <Languages className="h-4 w-4" />
-                  {isEnglish ? "عربي" : "English"}
-                </Button>
               </div>
 
-              {/* Product Image - Prominent Display */}
-              <Card className="overflow-hidden glass shadow-2xl rounded-[3rem]">
-                <div className="p-8 sm:p-12">
-                  <div className="flex flex-col items-center gap-6">
-                    {((productData.images && productData.images.length > 0) || productData.product_image_url) ? (
-                      <Carousel className="w-full max-w-lg mx-auto" opts={{ loop: true }}>
-                        <CarouselContent>
-                          {(productData.images && productData.images.length > 0
-                            ? productData.images
-                            : [productData.product_image_url]).filter(Boolean).map((imgUrl, index) => (
-                              <CarouselItem key={index}>
-                                <div className="flex items-center justify-center p-1">
-                                  <div className="w-full aspect-square rounded-[2rem] bg-white border border-black/5 dark:border-white/10 shadow-inner overflow-hidden relative group transition-all duration-300">
-                                    <img
-                                      src={imgUrl}
-                                      alt={`${getText(productData.product_name, productData.product_name_en)} - ${index + 1}`}
-                                      className="w-full h-full object-contain p-6"
-                                      data-testid={`img-product-${index}`}
-                                      onError={(e) => {
-                                        e.currentTarget.style.display = 'none';
-                                        const placeholder = e.currentTarget.nextElementSibling;
-                                        if (placeholder) placeholder.classList.remove('hidden');
-                                      }}
-                                    />
-                                    <div className={`w-full h-full flex flex-col items-center justify-center bg-muted absolute inset-0 hidden`}>
-                                      <Package className="h-20 w-20 text-muted-foreground mb-3 opacity-20" />
-                                      <p className="text-sm text-muted-foreground font-medium">
-                                        {isEnglish ? "Image not found" : "لم يتم العثور على صورة"}
-                                      </p>
-                                    </div>
-
-                                    {/* Tools Overlay */}
-                                    <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity flex items-end">
-                                      <div className="w-full p-3 bg-background/95 backdrop-blur-sm border-t flex gap-2">
-                                        <Button
-                                          size="sm"
-                                          variant="outline"
-                                          className="flex-1 text-xs gap-2 font-medium"
-                                          onClick={() => {
-                                            navigator.clipboard.writeText(imgUrl || "");
-                                            toast({ title: isEnglish ? "Copied" : "تم النسخ" });
-                                          }}
-                                        >
-                                          <Copy className="h-3.5 w-3.5" />
-                                          {isEnglish ? "Copy URL" : "نسخ الرابط"}
+              {/* Layout Content */}
+              <div className="grid gap-8 lg:grid-cols-3">
+                {/* Product Image Column */}
+                <div className="lg:col-span-1">
+                  <Card className="overflow-hidden glass shadow-2xl rounded-[3rem] border-primary/5 sticky top-28">
+                    <div className="p-8">
+                      <div className="flex flex-col items-center gap-6">
+                        {((productData.images && productData.images.length > 0) || productData.product_image_url) ? (
+                          <Carousel className="w-full" opts={{ loop: true }}>
+                            <CarouselContent>
+                              {(productData.images && productData.images.length > 0
+                                ? productData.images
+                                : [productData.product_image_url]).filter(Boolean).map((imgUrl, index) => (
+                                  <CarouselItem key={index}>
+                                    <div className="group relative aspect-square rounded-[2rem] bg-white border border-primary/10 shadow-inner overflow-hidden">
+                                      <img
+                                        src={imgUrl}
+                                        alt="Product"
+                                        className="w-full h-full object-contain p-6 group-hover:scale-110 transition-transform duration-700"
+                                      />
+                                      {/* Hover Action */}
+                                      <div className="absolute inset-0 bg-primary/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                        <Button size="icon" variant="secondary" className="rounded-xl shadow-xl hover:scale-110 transition-all" onClick={() => window.open(imgUrl, "_blank")}>
+                                          <ExternalLink className="h-5 w-5" />
                                         </Button>
-                                        <Button
-                                          size="icon"
-                                          variant="outline"
-                                          className="h-9 w-9"
-                                          onClick={() => window.open(imgUrl, "_blank")}
-                                        >
-                                          <ExternalLink className="h-4 w-4" />
-                                        </Button>
-                                        <Button
-                                          size="icon"
-                                          variant="outline"
-                                          className="h-9 w-9"
-                                          onClick={async () => {
-                                            if (!imgUrl) return;
-                                            try {
-                                              const response = await fetch(`/api/download-image?url=${encodeURIComponent(imgUrl)}`);
-                                              if (!response.ok) throw new Error("Download failed");
-                                              const blob = await response.blob();
-                                              const url = window.URL.createObjectURL(blob);
-                                              const a = document.createElement('a');
-                                              a.href = url;
-                                              a.download = `product-image-${index + 1}.jpg`;
-                                              document.body.appendChild(a);
-                                              a.click();
-                                              window.URL.revokeObjectURL(url);
-                                              document.body.removeChild(a);
-                                              toast({ title: isEnglish ? "Download Complete" : "اكتمل التحميل" });
-                                            } catch (error) {
-                                              toast({ title: isEnglish ? "Download Failed" : "فشل التحميل", variant: "destructive" });
-                                            }
-                                          }}
-                                        >
-                                          <Download className="h-4 w-4" />
+                                        <Button size="icon" variant="secondary" className="rounded-xl shadow-xl hover:scale-110 transition-all" onClick={() => {
+                                          navigator.clipboard.writeText(imgUrl || "");
+                                          toast({ title: isEnglish ? "Link Copied" : "تم نسخ الرابط" });
+                                        }}>
+                                          <Copy className="h-5 w-5" />
                                         </Button>
                                       </div>
                                     </div>
-                                  </div>
-                                </div>
-                              </CarouselItem>
-                            ))}
-                        </CarouselContent>
-                        <div className="absolute top-1/2 -left-4 sm:-left-12 transform -translate-y-1/2 flex">
-                          <CarouselPrevious />
-                        </div>
-                        <div className="absolute top-1/2 -right-4 sm:-right-12 transform -translate-y-1/2 flex">
-                          <CarouselNext />
-                        </div>
-                      </Carousel>
-                    ) : (
-                      <div className="w-full max-w-md aspect-square rounded-xl bg-muted/50 border-2 border-dashed flex flex-col items-center justify-center p-8">
-                        <Package className="h-20 w-20 text-muted-foreground/30 mb-4" />
-                        <p className="text-center text-muted-foreground font-arabic" dir="rtl">
-                          {isEnglish ? "No product images found" : "لم يتم العثور على صور رسمية للمنتج"}
-                        </p>
+                                  </CarouselItem>
+                                ))}
+                            </CarouselContent>
+                            <div className="flex justify-center gap-2 mt-4">
+                                <CarouselPrevious className="static translate-y-0 rounded-xl" />
+                                <CarouselNext className="static translate-y-0 rounded-xl" />
+                            </div>
+                          </Carousel>
+                        ) : (
+                          <div className="w-full aspect-square rounded-[2rem] bg-card/20 border-2 border-dashed border-primary/20 flex flex-col items-center justify-center p-8">
+                            <Package className="h-16 w-16 text-primary/30 mb-4" />
+                            <p className="text-center font-bold text-sm opacity-50 uppercase tracking-widest">{isEnglish ? "NO IMAGE" : "بدون صورة"}</p>
+                          </div>
+                        )}
                       </div>
-                    )}
-                    <p className="text-xs text-muted-foreground font-medium px-4 py-1.5 bg-muted rounded-full">
-                      {productData.images && productData.images.length > 1
-                        ? (isEnglish ? "Swipe to see multiple angles" : "اسحب لرؤية المزيد من الصور")
-                        : (isEnglish ? "Official source image" : "صورة من المصدر الرسمي")
-                      }
-                    </p>
+                    </div>
+                  </Card>
+                </div>
+
+                {/* Data Column */}
+                <div className="lg:col-span-2 space-y-4">
+                  {/* Basic Info */}
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <DataBox label={isEnglish ? "Product Identity" : "اسم المنتج"} value={getText(productData.product_name, productData.product_name_en)} dataTestId="text-product-name" big />
+                    <DataBox label={isEnglish ? "Brand" : "الماركة"} value={getText(productData.brand, productData.brand_en)} dataTestId="text-brand" />
+                    <DataBox label={isEnglish ? "Category" : "التصنيف"} value={getText(productData.category, productData.category_en)} dataTestId="text-category" />
+                    <DataBox label="BARCODE" value={productData.barcode} dataTestId="text-barcode" mono />
+                    <DataBox label="SKU" value={productData.sku} dataTestId="text-sku" mono primary />
+                  </div>
+
+                  {/* Descriptions */}
+                  <div className="space-y-4">
+                    <DescBox icon={Search} label={isEnglish ? "SEO Vision" : "وصف SEO"} value={getText(productData.seo_description || "", productData.seo_description_en)} />
+                    <DescBox icon={FileText} label={isEnglish ? "Marketing Blurb" : "الوصف التسويقي"} value={getText(productData.marketing_description, productData.marketing_description_en)} />
+                    <DescBox icon={Package} label={isEnglish ? "Technical Specifications" : "الوصف الكامل"} value={getText(productData.full_description, productData.full_description_en)} expandable />
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex flex-wrap gap-4 pt-4">
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      className="flex-1 py-7 text-lg gap-2 rounded-2xl border-primary/10 glass hover:bg-primary/5 font-bold transition-all"
+                      onClick={handleReset}
+                    >
+                      <RefreshCw className="h-5 w-5" />
+                      {isEnglish ? "NEW PRODUCT" : "منتج جديد"}
+                    </Button>
+                    <Button
+                      size="lg"
+                      className="flex-1 py-7 text-lg gap-3 rounded-2xl bg-[#00b289] hover:bg-[#008f6e] text-white shadow-xl shadow-[#00b289]/10 font-black transition-all"
+                      disabled={downloadMutation.isPending}
+                      onClick={() => downloadMutation.mutate()}
+                    >
+                      <Download className="h-6 w-6" />
+                      SALLA EXPORT
+                    </Button>
+                    <Button
+                      size="lg"
+                      className="flex-1 py-7 text-lg gap-3 rounded-2xl bg-[#7e3af2] hover:bg-[#6c2bd9] text-white shadow-xl shadow-[#7e3af2]/10 font-black transition-all"
+                      disabled={downloadZidMutation.isPending}
+                      onClick={() => downloadZidMutation.mutate()}
+                    >
+                      <Download className="h-6 w-6" />
+                      ZID EXPORT
+                    </Button>
                   </div>
                 </div>
-              </Card>
-
-              {/* Product Info Grid */}
-              <div className="grid gap-3 md:grid-cols-2">
-                {/* Product Name */}
-                <button
-                  type="button"
-                  className={`md:col-span-2 flex items-center justify-between gap-3 p-5 rounded-2xl glass shadow-sm cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-colors ${isEnglish ? 'text-left' : 'text-right'}`}
-                  onClick={() => handleCopyText(getText(productData.product_name, productData.product_name_en), isEnglish ? "Product Name" : "اسم المنتج")}
-                  title={isEnglish ? "Click to copy" : "انقر للنسخ"}
-                  data-testid="button-copy-product-name"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs text-muted-foreground mb-1">{isEnglish ? "Product Name" : "اسم المنتج"}</p>
-                    <p className="text-lg font-bold" data-testid="text-product-name">
-                      {getText(productData.product_name, productData.product_name_en)}
-                    </p>
-                  </div>
-                  <Copy className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                </button>
-
-                {/* Brand */}
-                <button
-                  type="button"
-                  className={`flex items-center justify-between gap-3 p-5 rounded-2xl glass shadow-sm cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-colors ${isEnglish ? 'text-left' : 'text-right'}`}
-                  onClick={() => handleCopyText(getText(productData.brand, productData.brand_en), isEnglish ? "Brand" : "الماركة")}
-                  title={isEnglish ? "Click to copy" : "انقر للنسخ"}
-                  data-testid="button-copy-brand"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs text-muted-foreground mb-1">{isEnglish ? "Brand" : "الماركة"}</p>
-                    <p className="text-base font-semibold" data-testid="text-brand">
-                      {getText(productData.brand, productData.brand_en)}
-                    </p>
-                  </div>
-                  <Copy className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                </button>
-
-                {/* Category */}
-                <button
-                  type="button"
-                  className={`flex items-center justify-between gap-3 p-5 rounded-2xl glass shadow-sm cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-colors ${isEnglish ? 'text-left' : 'text-right'}`}
-                  onClick={() => handleCopyText(getText(productData.category, productData.category_en), isEnglish ? "Category" : "التصنيف")}
-                  title={isEnglish ? "Click to copy" : "انقر للنسخ"}
-                  data-testid="button-copy-category"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs text-muted-foreground mb-1">{isEnglish ? "Category" : "التصنيف"}</p>
-                    <p className="text-base font-semibold" data-testid="text-category">
-                      {getText(productData.category, productData.category_en)}
-                    </p>
-                  </div>
-                  <Copy className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                </button>
-
-                {/* Barcode */}
-                <button
-                  type="button"
-                  className={`flex items-center justify-between gap-3 p-5 rounded-2xl glass shadow-sm cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-colors ${isEnglish ? 'text-left' : 'text-right'}`}
-                  onClick={() => handleCopyText(productData.barcode, isEnglish ? "Barcode" : "الباركود")}
-                  title={isEnglish ? "Click to copy" : "انقر للنسخ"}
-                  data-testid="button-copy-barcode"
-                >
-                  <div className="min-w-0 flex-1 flex items-center gap-2">
-                    <Barcode className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1">{isEnglish ? "Barcode" : "الباركود"}</p>
-                      <p className="font-mono text-base font-bold" data-testid="text-barcode">
-                        {productData.barcode}
-                      </p>
-                    </div>
-                  </div>
-                  <Copy className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                </button>
-
-                {/* SKU */}
-                <button
-                  type="button"
-                  className={`flex items-center justify-between gap-3 p-5 rounded-2xl glass shadow-sm cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-colors ${isEnglish ? 'text-left' : 'text-right'}`}
-                  onClick={() => handleCopyText(productData.sku, "SKU")}
-                  title={isEnglish ? "Click to copy" : "انقر للنسخ"}
-                  data-testid="button-copy-sku"
-                >
-                  <div className="min-w-0 flex-1 flex items-center gap-2">
-                    <Tag className="h-5 w-5 text-primary flex-shrink-0" />
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1">SKU</p>
-                      <p className="font-mono text-base font-bold" data-testid="text-sku">
-                        {productData.sku}
-                      </p>
-                    </div>
-                  </div>
-                  <Copy className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                </button>
-
-                {/* Image URL */}
-                {productData.product_image_url && (
-                  <div className="p-5 rounded-2xl glass shadow-sm">
-                    <p className="text-xs text-muted-foreground mb-2">{isEnglish ? "Image URL" : "رابط الصورة"}</p>
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="flex-1 text-xs gap-1 border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5"
-                        onClick={handleCopyImageUrl}
-                        aria-label={isEnglish ? "Copy image URL" : "نسخ رابط الصورة"}
-                        data-testid="button-copy-image-url"
-                      >
-                        {copiedUrl ? <Check className="h-3 w-3 text-primary" /> : <Copy className="h-3 w-3" />}
-                        {copiedUrl ? (isEnglish ? "Copied" : "تم النسخ") : (isEnglish ? "Copy URL" : "نسخ الرابط")}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="gap-1 text-xs border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5"
-                        onClick={() => window.open(productData.product_image_url, "_blank")}
-                        aria-label={isEnglish ? "Open image" : "فتح الصورة"}
-                        data-testid="button-open-image"
-                      >
-                        <ExternalLink className="h-3 w-3" />
-                        {isEnglish ? "Open" : "فتح"}
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* SEO Description */}
-              {(productData.seo_description || productData.seo_description_en) && (
-                <Card className="glass shadow-sm rounded-2xl overflow-hidden">
-                  <button
-                    type="button"
-                    className={`w-full p-5 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-colors ${isEnglish ? 'text-left' : 'text-right'}`}
-                    onClick={() => handleCopyText(getText(productData.seo_description || "", productData.seo_description_en), isEnglish ? "SEO Description" : "وصف SEO")}
-                    title={isEnglish ? "Click to copy" : "انقر للنسخ"}
-                    data-testid="button-copy-seo-desc"
-                  >
-                    <div className="flex items-center justify-between gap-3 mb-3">
-                      <h4 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
-                        <Search className="h-4 w-4" />
-                        {isEnglish ? "SEO Description" : "وصف SEO"}
-                      </h4>
-                      <Copy className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                    <p className="text-sm leading-relaxed">
-                      {getText(productData.seo_description || "", productData.seo_description_en)}
-                    </p>
-                  </button>
-                </Card>
-              )}
-
-              {/* Marketing Description */}
-              <Card className="glass shadow-sm rounded-2xl overflow-hidden">
-                <button
-                  type="button"
-                  className={`w-full p-5 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-colors ${isEnglish ? 'text-left' : 'text-right'}`}
-                  onClick={() => handleCopyText(getText(productData.marketing_description, productData.marketing_description_en), isEnglish ? "Marketing Description" : "الوصف التسويقي")}
-                  title={isEnglish ? "Click to copy" : "انقر للنسخ"}
-                  data-testid="button-copy-marketing-desc"
-                >
-                  <div className="flex items-center justify-between gap-3 mb-3">
-                    <h4 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
-                      <FileText className="h-4 w-4" />
-                      {isEnglish ? "Marketing Description" : "الوصف التسويقي"}
-                    </h4>
-                    <Copy className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                    {getText(productData.marketing_description, productData.marketing_description_en)}
-                  </p>
-                </button>
-              </Card>
-
-              {/* Full Description */}
-              <Card className="glass shadow-sm rounded-2xl overflow-hidden">
-                <button
-                  type="button"
-                  className={`w-full p-6 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-colors ${isEnglish ? 'text-left' : 'text-right'} max-h-[400px] overflow-y-auto`}
-                  onClick={() => handleCopyText(getText(productData.full_description, productData.full_description_en), isEnglish ? "Full Description" : "الوصف الكامل")}
-                  title={isEnglish ? "Click to copy" : "انقر للنسخ"}
-                  data-testid="button-copy-full-desc"
-                >
-                  <div className="flex items-center justify-between gap-3 mb-3">
-                    <h4 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
-                      <Package className="h-4 w-4" />
-                      {isEnglish ? "Full Description" : "الوصف الكامل"}
-                    </h4>
-                    <Copy className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                    {getText(productData.full_description, productData.full_description_en)}
-                  </p>
-                </button>
-              </Card>
-
-              <div className="flex justify-center gap-4 flex-wrap">
-                <Button
-                  size="lg"
-                  variant="outline"
-                  className="px-6 py-6 text-lg gap-2"
-                  onClick={handleReset}
-                  data-testid="button-reset"
-                >
-                  <RefreshCw className="h-5 w-5" />
-                  {isEnglish ? "Upload Another Product" : "رفع منتج آخر"}
-                </Button>
-                <Button
-                  size="lg"
-                  className="px-8 py-6 text-lg gap-2 bg-[#00b289] hover:bg-[#008f6e] text-white" // Salla Green
-                  disabled={downloadMutation.isPending}
-                  onClick={() => downloadMutation.mutate()}
-                  data-testid="button-download"
-                >
-                  {downloadMutation.isPending ? (
-                    <>
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                      {isEnglish ? "Generating..." : "جاري المعالجة..."}
-                    </>
-                  ) : (
-                    <>
-                      <div className="flex flex-col items-center leading-none">
-                        <span className="text-[10px] opacity-80 uppercase tracking-tight">Export for</span>
-                        <span className="font-bold">Salla</span>
-                      </div>
-                      <Download className="h-5 w-5 ml-1" />
-                    </>
-                  )}
-                </Button>
-                <Button
-                  size="lg"
-                  className="px-8 py-6 text-lg gap-2 bg-[#7e3af2] hover:bg-[#6c2bd9] text-white" // Zid Purple
-                  disabled={downloadZidMutation.isPending}
-                  onClick={() => downloadZidMutation.mutate()}
-                  data-testid="button-download-zid"
-                >
-                  {downloadZidMutation.isPending ? (
-                    <>
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                      {isEnglish ? "Generating..." : "جاري المعالجة..."}
-                    </>
-                  ) : (
-                    <>
-                      <div className="flex flex-col items-center leading-none">
-                        <span className="text-[10px] opacity-80 uppercase tracking-tight">Export for</span>
-                        <span className="font-bold">Zid</span>
-                      </div>
-                      <Download className="h-5 w-5 ml-1" />
-                    </>
-                  )}
-                </Button>
               </div>
             </div>
           )}
         </div>
       </main>
 
-      <footer className="border-t mt-16">
-        <div className="max-w-6xl mx-auto px-6 py-6">
-          <p className="text-center text-sm text-muted-foreground font-arabic" dir="rtl">
-            مُدخل البيانات بالذكاء الإصطناعي - احدى منتجات SLOQ INC.
+      <footer className="border-t border-primary/5 mt-20 relative z-10">
+        <div className="max-w-6xl mx-auto px-6 py-10 flex flex-col md:flex-row items-center justify-between gap-6">
+           <p className="text-sm font-black italic opacity-40 uppercase tracking-widest">
+            {isEnglish ? "Product of SLOQ INC." : "مُنتج من شركة SLOQ INC."}
           </p>
+          <div className="flex gap-8">
+            <span className="text-[10px] font-black uppercase tracking-[0.3em] opacity-30">Vision Sense AI</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.3em] opacity-30">v2.0 Beta</span>
+          </div>
         </div>
       </footer>
     </div>
+  );
+}
+
+function DataBox({ label, value, big, mono, primary, dataTestId }: { label: string; value: string; big?: boolean; mono?: boolean; primary?: boolean; dataTestId?: string }) {
+  const { isEnglish } = useLanguage();
+  const { toast } = useToast();
+  
+  return (
+    <div 
+      className={`p-6 rounded-3xl glass border-primary/10 hover:bg-primary/5 transition-all cursor-pointer group ${big ? 'md:col-span-2' : ''}`}
+      onClick={() => {
+        navigator.clipboard.writeText(value);
+        toast({ title: isEnglish ? "Field Copied" : "تم نسخ الحقل" });
+      }}
+    >
+      <div className="flex justify-between items-start">
+        <div className="space-y-1">
+          <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest opacity-60 group-hover:opacity-100 transition-opacity">{label}</p>
+          <p className={`font-bold leading-tight ${big ? 'text-2xl' : 'text-lg'} ${mono ? 'font-mono tracking-tighter' : ''} ${primary ? 'text-primary' : 'text-foreground'}`} data-testid={dataTestId}>
+            {value || "---"}
+          </p>
+        </div>
+        <Copy className="h-4 w-4 text-primary opacity-0 group-hover:opacity-40 transition-opacity" />
+      </div>
+    </div>
+  );
+}
+
+function DescBox({ icon: Icon, label, value, expandable }: { icon: any; label: string; value: string; expandable?: boolean }) {
+  const { isEnglish } = useLanguage();
+  const { toast } = useToast();
+  
+  if (!value) return null;
+
+  return (
+    <Card className={`glass border-primary/5 hover:border-primary/20 transition-all rounded-3xl overflow-hidden group`}>
+      <div 
+        className="p-6 cursor-pointer hover:bg-primary/5 transition-colors"
+        onClick={() => {
+          navigator.clipboard.writeText(value);
+          toast({ title: isEnglish ? "Message Copied" : "تم نسخ النص" });
+        }}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-xl bg-primary/10 text-primary">
+              <Icon className="h-4 w-4" />
+            </div>
+            <h4 className="text-xs font-black uppercase tracking-widest opacity-60">
+              {label}
+            </h4>
+          </div>
+          <Copy className="h-4 w-4 text-primary opacity-0 group-hover:opacity-40 transition-opacity" />
+        </div>
+        <div className={`text-sm font-bold leading-relaxed whitespace-pre-wrap ${expandable ? 'max-h-[250px] overflow-y-auto pr-2' : ''}`}>
+          {value}
+        </div>
+      </div>
+    </Card>
   );
 }
