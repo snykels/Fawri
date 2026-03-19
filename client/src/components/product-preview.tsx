@@ -50,7 +50,7 @@ export function ProductPreview({ data }: ProductPreviewProps) {
                 className="text-lg font-mono font-medium"
                 data-testid="text-sku"
               >
-                {data.sku_barcode}
+                {data.sku || data.barcode}
               </p>
             </div>
           </div>

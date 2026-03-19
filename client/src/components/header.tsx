@@ -1,26 +1,23 @@
 import { ThemeToggle } from "./theme-toggle";
 import { FileSpreadsheet } from "lucide-react";
+import { useTheme } from "@/lib/theme-provider";
 
 export function Header() {
+  const { theme } = useTheme();
+
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="flex h-16 items-center justify-between gap-4 px-6">
+    <header className="sticky top-0 z-50 w-full border-b border-white/10 bg-background/60 backdrop-blur-xl transition-all duration-300">
+      <div className="flex h-16 items-center justify-between gap-4 px-6 max-w-7xl mx-auto">
         <div className="flex items-center gap-3">
-          <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-primary text-primary-foreground">
-            <FileSpreadsheet className="h-5 w-5" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-lg font-bold leading-tight">
-                Salla Product Lister AI
-              </h1>
-              <span className="text-lg font-bold font-arabic hidden md:inline" dir="rtl">
-                منشئ قوائم سلة
-              </span>
-            </div>
-            <p className="text-xs text-muted-foreground hidden sm:block">
-              AI-powered product listing generator
-            </p>
+          <div className="flex items-center gap-2">
+            <img
+              src={theme === "dark" ? "/logo-dark-mode.png" : "/logo_full.png"}
+              alt="Salla PriceSense"
+              className="h-8 w-auto object-contain"
+            />
+            <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-[#5F3AF2] text-white rounded-md border border-white/20">
+              Beta
+            </span>
           </div>
         </div>
 

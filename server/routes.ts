@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import express, { type Express } from "express";
 import { createServer, type Server } from "http";
 import { GoogleGenAI } from "@google/genai";
 import ExcelJS from "exceljs";
@@ -6,135 +6,410 @@ import sharp from "sharp";
 import path from "path";
 import fs from "fs";
 import { productDataSchema, type ProductData } from "@shared/schema";
+import { image_search } from "duckduckgo-images-api";
+import { db } from "./db";
+import { uploadedProducts } from "@shared/schema";
+import { eq, desc } from "drizzle-orm";
+import session from "express-session";
+import crypto from "crypto";
 
-const smartAnalysisPrompt = `**أنت ثلاثة خبراء في شخص واحد:**
-1. **وكيل استخبارات المنتجات (Product Intelligence Agent)** - متخصص في البحث العكسي (OSINT)
-2. **خبير SEO للتجارة الإلكترونية (Technical eCommerce SEO Specialist)** - محلل بيانات منتجات
-3. **باحث صور المنتجات (Product Image Researcher)** - يبحث عن أفضل صور احترافية من المصادر الرسمية
-
-مهمتك: تحليل صور المنتج واستخراج "البصمة الرقمية الكاملة" باتباع منهجية البحث الاستخباراتي المتسلسل.
-
----
-
-## 🔍 المرحلة الأولى: التدقيق البصري واستخراج الكلمات المفتاحية
-
-### Visual Audit & OCR:
-- قم بإجراء OCR لأي كود أو نص على العبوة
-- حلل "النية البحثية" (Search Intent): ما الكلمات المفتاحية التي سيستخدمها العميل؟
-- حدد البراند (Brand) والسلسلة (Series)
-- استخرج المميزات الفريدة: شكل، لون، أزرار، حجم
+const smartAnalysisPrompt = `**أنت خبير منتجات ومحترف SEO.**
+مهمتك استخراج بيانات المنتج بدقة 100% من الصور والنصوص (OCR).
 
 ---
 
-## 🎯 المرحلة الثانية: صيد المعرفات التقنية (The Identifier Hunt)
-
-### البحث المتسلسل:
-1. **البحث عن MPN:** استخدم الكلمات المفتاحية للعثور على رقم تصنيع القطعة (Manufacturer Part Number)
-2. **البحث عن SKU/ASIN:** ابحث في Amazon/eBay لاستخراج الـ ASIN أو SKU
-3. **استخراج GTIN/EAN:** بناءً على MPN و ASIN، قم بالبحث المتقاطع (Cross-Reference) للعثور على الباركود العالمي
-
----
-
-## ✅ المرحلة الثالثة: حلقة التحقق العكسي (Validation Loop)
-
-- قم بـ "بحث عكسي" بالباركود للتأكد أنه يظهر نفس المنتج
-- تأكد أن المواصفات تتطابق مع الصورة (اللون، الإصدار، الحجم)
-- إذا لم تجد الباركود، قدم رقم الموديل (MPN) بدقة عالية
+## 📸 تعليمات البحث عن الصور ودقة الألوان:
+المستخدم يشتكي من "عدم العثور على صورة" أو ظهور "صورة الكرتون" أو "خطأ في اللون".
+1. **اللون (Color Accuracy):** استخرج لون المنتج الفعلي بعناية. إذا كان الجهاز أسود والخلفية بيضاء، فاللون هو **أسود**. لا تخطئ بين لون الخلفية أو الانعكاسات ولون المنتج.
+2. **اسم المنتج للبحث:** يجب أن يكون الاسم في حقل \`product_name\` هو اسم الجهاز/المنتج الفعلي فقط.
+3. **استبعاد التغليف:** استبعد أي كلمات تتعلق بالتغليف (الكرتون، Box، إلخ).
+4. **الجودة:** ابحث عن صور بخلفية بيضاء (White Background).
 
 ---
 
-## 🖼️ المرحلة الرابعة: البحث عن صورة احترافية (Google Lens Style)
+## 📝 تعليمات المحتوى (Content Instructions):
 
-### مهم جداً - ابحث عن صورة المنتج مثل Google Lens:
-بعد تحديد المنتج، تخيل أنك تستخدم Google Lens للبحث عن صور المنتج:
-
-#### خطوات البحث (مثل Google Lens → Google Shopping):
-1. استخدم اسم المنتج الكامل (Brand + Model + Variant) للبحث
-2. ابحث في "Google Shopping" عن المنتج - ستجد صور احترافية من المتاجر
-3. اختر أفضل صورة من المنتجات المطابقة
-
-#### المصادر بالترتيب (حسب الأولوية):
-1. **Google Shopping / المتاجر الإلكترونية** - تظهر صور احترافية للمنتجات
-2. **الموقع الرسمي للشركة المصنعة** (samsung.com, apple.com, xiaomi.com, huawei.com, oppo.com, brave.com.sa, etc.)
-3. **GSMArena** للهواتف والتابلت (fdn.gsmarena.com, cdn.gsmarena.com)
-4. **Amazon** (m.media-amazon.com, images-na.ssl-images-amazon.com)
-5. **Noon** (f.nooncdn.com)
-6. **AliExpress** (ae01.alicdn.com)
-7. **المتاجر السعودية** (jarir.com, extra.com, sharafdg.com)
-
-### متطلبات الصورة:
-- يجب أن تكون HTTPS
-- يجب أن تكون صورة واضحة للمنتج على خلفية بيضاء أو شفافة
-- يجب أن تطابق اللون والموديل المحدد
-- يفضل الصور عالية الجودة (PNG أو JPG)
-- **الأفضل: صورة المنتج فقط بدون العلبة أو الإكسسوارات**
+### 1. 🏷️ اسم المنتج (Product Name):
+- **يجب أن يكون بالعربي، واضحاً، وشاملاً للجهاز فقط.**
+- **الصيغة:** [الماركة] [الموديل] [السلسلة] - [السعة]، [الرام]، [اللون]
+- **مثال ممتاز:** موتورولا موتو G30 برو، 128 جيجا، 6 جيجا رام - لون أسود فلكي
 
 ---
 
-## 📱 للهواتف والتابلت - وصف مفصل:
-
-### وصف SEO (سطر ونصف - 20-40 كلمة):
-وصف قصير للظهور في نتائج البحث، يحتوي على الكلمات المفتاحية الأساسية
-
-### الوصف التسويقي (50-100 كلمة):
-اذكر: المعالج، الكاميرا، الشاشة، نظام التشغيل، التخزين، البطارية
-استخدم كلمات مفتاحية جذابة ولغة تحفيزية
-
-### الوصف الكامل المفصل (300-600 كلمة):
-- المواصفات التفصيلية الكاملة: الأبعاد، الوزن، المعالج، معالج الرسومات، منفذ الشحن، السرعة، الشاشة، الكاميرات، البطارية، الشحن السريع
-- محتويات العلبة: الجهاز، الشاحن، الكابل، دليل المستخدم، الضمان
-- نسخة الشرق الأوسط والضمان
-- جميع المميزات والتقنيات المدعومة
-- استخدم gsmarena.com أو devicespecifications.com للتأكد من المعلومات
-- ممنوع الفيسات التعبيرية
-- ممنوع رموز التحرير (### أو ****)
-- اكتب اسم الماركة بالعربي والإنجليزي
+## 🔍 خطوات العمل:
+1. **OCR:** استخدم النص من Cloud Vision لتحديد الموديل بدقة.
+2. **اللون:** حدد اللون من الرؤية البصرية بتركيز عالي.
+3. **الاسم:** استخرج الاسم الصافي (Xiaomi 13 Pro وليس Xiaomi 13 Pro Box).
 
 ---
 
-## 📋 البيانات المطلوبة (JSON فقط):
-
+## 📋 البيانات المطلوبة (JSON):
 {
-  "product_name": "[الماركة] [السلسلة] [الموديل]، [السعة] جيجا، [الرام] جيجا - [اللون]",
-  "seo_title": "",
-  "seo_description": "وصف SEO قصير 20-40 كلمة للظهور في نتائج البحث",
-  "marketing_description": "وصف تسويقي 50-100 كلمة يشمل المعالج والكاميرا والشاشة والبطارية",
-  "full_description": "وصف كامل ومفصل 300-600 كلمة: جميع المواصفات التفصيلية، محتويات العلبة، نسخة الشرق الأوسط، جميع المميزات",
-  "category": "التصنيف (هواتف ذكية / تابلت / سماعات / أجهزة منزلية)",
-  "brand": "اسم الماركة بالعربي",
-  "sku_barcode": "الباركود (GTIN/EAN/UPC 12-13 رقم) أو رقم الموديل (MPN)",
-  "product_image_url": "رابط HTTPS لصورة احترافية من المصدر الرسمي أو GSMArena أو Amazon",
-  "product_name_en": "English product name: [Brand] [Series] [Model], [Storage]GB, [RAM]GB - [Color]",
-  "seo_description_en": "Short English SEO description 20-40 words",
-  "marketing_description_en": "English marketing description 50-100 words",
-  "full_description_en": "Full English description 300-600 words with all specifications",
-  "category_en": "Category in English (Smartphones / Tablets / Headphones / Home Appliances)",
-  "brand_en": "Brand name in English"
+  "product_name": "[الماركة بالعربي] [الموديل] [السعة] - [اللون]",
+  "seo_title": "عنوان جذاب لمحركات البحث",
+  "seo_description": "وصف ميتا مختصر",
+  "marketing_description": "وصف تسويقي",
+  "full_description": "المقال التفصيلي المقسم (Markdown)",
+  "category": "التصنيف",
+  "brand": "الماركة",
+  "sku": "SKU",
+  "barcode": "Barcode",
+  "product_image_url": "",
+  "product_name_en": "Clean English Name",
+  "seo_description_en": "English SEO Description",
+  "marketing_description_en": "English Marketing Description",
+  "full_description_en": "English Full Description",
+  "category_en": "Category (English)",
+  "brand_en": "Brand (English)"
 }
 
----
+ابدأ التحليل...`;
 
-## 🏷️ الماركات المعروفة:
-سامسونج Samsung، آبل Apple، شاومي Xiaomi، هواوي Huawei، أوبو OPPO، فيفو Vivo، ريلمي Realme، ون بلس OnePlus، هونر Honor، نوكيا Nokia، موتورولا Motorola، سوني Sony، جوجل Google، إنفينكس Infinix، تكنو Tecno، ريدمي Redmi، بوكو POCO، أنكر Anker، جي بي إل JBL
+interface CloudVisionResponse {
+  responses: Array<{
+    textAnnotations?: Array<{
+      description: string;
+    }>;
+  }>;
+}
 
----
+async function performOCR(imageBuffer: Buffer, apiKey: string): Promise<string> {
+  try {
+    console.log(`[OCR] Starting OCR for image size: ${imageBuffer.length}`);
+    const base64Image = imageBuffer.toString('base64');
 
-## ⚠️ قواعد صارمة:
-1. **ممنوع "غير معروف" أو "Unknown" أو "N/A"**
-2. **لا تترك أي حقل فارغ**
-3. **الأولوية للباركود (GTIN)**
-4. **أجب بـ JSON فقط** - بدون markdown
-5. **ممنوع الفيسات التعبيرية**
-6. **product_image_url يجب أن يكون رابط HTTPS حقيقي من مصدر موثوق**
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000); // 8 second timeout for OCR
 
----
+    const response = await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: controller.signal,
+      body: JSON.stringify({
+        requests: [
+          {
+            image: { content: base64Image },
+            features: [{ type: "TEXT_DETECTION" }]
+          }
+        ]
+      })
+    });
 
-ابدأ التحليل الآن...`;
+    clearTimeout(timeout);
+
+    if (!response.ok) {
+      console.error("Cloud Vision API Error:", response.status, await response.text());
+      return "";
+    }
+
+    const data = await response.json() as CloudVisionResponse;
+    const text = data.responses[0]?.textAnnotations?.[0]?.description || "";
+    console.log(`[OCR] Success, found text length: ${text.length}`);
+    return text;
+  } catch (error) {
+    console.error("OCR Failed:", error);
+    return "";
+  }
+}
+
+async function manualDuckDuckGoSearch(query: string): Promise<string[]> {
+  try {
+    console.log(`[Manual Search] Trying DuckDuckGo for: ${query}`);
+    let mainPageText = "";
+
+    // Method from test-image-search.ts which is verified to work
+    try {
+      const mainPageRes = await fetch(`https://duckduckgo.com/?q=${encodeURIComponent(query)}&t=h_&iar=images&iax=images&ia=images`);
+      mainPageText = await mainPageRes.text();
+      const vqdMatch = mainPageText.match(/vqd=['\"]([^'\"]+)['\"]/);
+      const vqd = vqdMatch ? vqdMatch[1] : null;
+
+      if (vqd) {
+        const searchUrl = `https://duckduckgo.com/i.js?q=${encodeURIComponent(query)}&o=json&vqd=${vqd}`;
+        const res = await fetch(searchUrl);
+
+        if (res.ok) {
+          const data = await res.json() as any;
+          if (data.results && Array.isArray(data.results)) {
+            console.log(`[Manual Search] DDG Success: ${data.results.length} images`);
+            return data.results.map((r: any) => r.image).filter(Boolean);
+          }
+        }
+      } else {
+        console.log("[Manual Search] Could not find vqd token.");
+      }
+    } catch (ddgError) {
+      console.log("[Manual Search] DDG failed, trying fallbacks...", ddgError);
+    }
+
+    // 2. Bing Fallback with better regex
+    console.log("[Manual Search] Trying Bing fallback...");
+    const userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+    const bingRes = await fetch(`https://www.bing.com/images/search?q=${encodeURIComponent(query)}&first=1`, {
+      headers: { "User-Agent": userAgent }
+    });
+    const bingText = await bingRes.text();
+    const bingMatches = bingText.match(/murl&quot;:&quot;(https?:\/\/.*?)&quot;/g);
+    if (bingMatches && bingMatches.length > 0) {
+      const cleaned = bingMatches.map(m => m.match(/murl&quot;:&quot;(.*?)&quot;/)?.[1]).filter(Boolean) as string[];
+      console.log(`[Manual Search] Bing Success: ${cleaned.length} images`);
+      return cleaned;
+    }
+
+    // 3. Google Fallback (Limited)
+    console.log("[Manual Search] Trying Google fallback...");
+    const googleRes = await fetch(`https://www.google.com/search?q=${encodeURIComponent(query)}&tbm=isch`, {
+      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36" }
+    });
+    const googleText = await googleRes.text();
+    const googleMatches = googleText.match(/\[\"(https?:\/\/.*?)\",\d+,\d+\]/g);
+    if (googleMatches && googleMatches.length > 0) {
+      const cleaned = googleMatches.map(m => m.match(/\[\"(.*?)\"/)?.[1]).filter(Boolean) as string[];
+      console.log(`[Manual Search] Google Success: ${cleaned.length} images`);
+      return cleaned;
+    }
+
+    // 4. Last resort: generic URL search
+    const genericUrls = mainPageText.match(/https?:\/\/[^\"'\\s]+\.(?:jpg|jpeg|png|webp)/gi);
+
+    if (genericUrls && genericUrls.length > 0) {
+      return (Array.from(new Set(genericUrls)) as string[]).filter((u: string) => !u.includes("duckduckgo.com"));
+    }
+
+    return [];
+  } catch (error) {
+    console.error("[Manual Search] Error:", error);
+    return [];
+  }
+}
+
+async function findProductImages(query: string, limit: number = 8): Promise<string[]> {
+
+  try {
+    console.log(`[Image Search] Searching for: ${query}`);
+
+    // Try multiple query variations if needed based on user feedback
+    const queries = [
+      query,
+      query + " official product photo",
+      query + " site:gsmarena.com OR site:noon.com OR site:amazon.ae", // Regional focus
+      query + " site:samsung.com OR site:apple.com OR site:mi.com OR site:huawei.com", // Official sites
+      query.replace(/official white background product/i, "").trim() + " product white background",
+      query + " white background"
+    ];
+
+    let allResults: string[] = [];
+    for (const q of queries) {
+      console.log(`[Image Search] Trying query variation: ${q}`);
+      let results: string[] = [];
+      try {
+        // Try library first
+        results = (await image_search({
+          query: q,
+          moderate: true,
+          iterations: 1
+        })).map((r: any) => r.image);
+      } catch (e) {
+        console.log(`[Image Search] Library failed for ${q}, trying manual fallback...`);
+      }
+
+      // If library fails or returns nothing, try manual
+      if (!results || results.length === 0) {
+        results = await manualDuckDuckGoSearch(q);
+      }
+
+      if (results && results.length > 0) {
+        allResults = [...allResults, ...results];
+        if (allResults.length >= 30) break; // More results for better filtering
+      }
+    }
+
+
+    if (allResults.length === 0) {
+      console.log("[Image Search] No results found across all variations.");
+      return [];
+    }
+
+    const images: string[] = [];
+    const seenUrls = new Set<string>();
+
+    const verifyImage = async (url: string): Promise<boolean> => {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // Increased timeout to 5s
+
+        const response = await fetch(url, {
+          method: "GET",
+          signal: controller.signal,
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "image/*",
+            "Range": "bytes=0-1024",
+          },
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) return false;
+
+        const contentType = response.headers.get("content-type") || "";
+        // If it's a 200 OK and from a trusted domain, we can be more lenient even if content-type is wonky
+        const urlObj = new URL(url);
+        const trusted = ["nooncdn.com", "amazon.com", "ssl-images-amazon.com", "media-amazon.com", "gsmarena.com", "samsung.com", "apple.com"].some(d => urlObj.hostname.includes(d));
+
+        return contentType.startsWith("image/") || (trusted && response.status === 200);
+      } catch (e: any) {
+        return false;
+      }
+    };
+
+    for (const url of allResults) {
+      if (images.length >= limit) break;
+
+      if (!url || !url.startsWith("https://") || seenUrls.has(url)) continue;
+      seenUrls.add(url);
+
+      const lowerUrl = url.toLowerCase();
+      // Heuristics to avoid garbage
+      if (lowerUrl.includes("logo") || lowerUrl.includes("icon") || lowerUrl.includes("banner") || lowerUrl.includes("placeholder")) continue;
+
+      // Prioritize common product image patterns
+      const isLikelyProduct = lowerUrl.includes("product") || lowerUrl.includes("media") || lowerUrl.includes("nooncdn") || lowerUrl.includes("amazon");
+
+      const isImage = /\.(jpg|jpeg|png|webp)$/.test(lowerUrl);
+      if (!isImage && !lowerUrl.includes("images")) continue;
+
+      if (await verifyImage(url)) {
+        console.log(`[Image Search] Verified: ${url}`);
+        images.push(url);
+      }
+    }
+
+    return images;
+  } catch (error) {
+    console.error("[Image Search] Error:", error);
+    return [];
+  }
+}
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+
+  // Simple session setup for admin
+  app.use(session({
+    secret: "salla-admin-secret",
+    resave: false,
+    saveUninitialized: false,
+    cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 }
+  }));
+
+  // Create uploads dir
+  const uploadsDir = path.join(process.cwd(), "attached_assets", "uploads");
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+  app.use("/uploads", express.static(uploadsDir));
+
+  // Salla Credentials from User Prompt
+  const SALLA_CLIENT_ID = "3b98cad1-c0ea-415c-9a98-f9288cc95365";
+  const SALLA_SECRET_KEY = "1ad23a9c67438be75908c28ba0ce500f294609933dfebc50d80a95cb0fc14ee0";
+
+  app.post("/api/admin/login", (req, res) => {
+    const { username, password } = req.body;
+    if (username === "admin" && password === "admin") {
+      (req.session as any).isAdmin = true;
+      return res.json({ success: true });
+    }
+    return res.status(401).json({ success: false, message: "Invalid credentials" });
+  });
+
+  app.post("/api/admin/logout", (req, res) => {
+    req.session.destroy(() => {
+      res.json({ success: true });
+    });
+  });
+
+  const requireAdmin = (req: any, res: any, next: any) => {
+    if (req.session && req.session.isAdmin) {
+      return next();
+    }
+    return res.status(401).json({ success: false, message: "Unauthorized" });
+  };
+
+  app.get("/api/admin/products", requireAdmin, async (req, res) => {
+    try {
+      const products = await db.select().from(uploadedProducts).orderBy(desc(uploadedProducts.uploadedAt));
+      res.json({ success: true, data: products });
+    } catch (e: any) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  app.post("/api/admin/products/:id/sync", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { isSynced } = req.body;
+      const updated = await db.update(uploadedProducts)
+        .set({ 
+          isSynced, 
+          syncedAt: isSynced ? new Date() : null 
+        })
+        .where(eq(uploadedProducts.id, parseInt(id)))
+        .returning();
+      
+      res.json({ success: true, data: updated[0] });
+    } catch (e: any) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  // Salla API Endpoint to pull products
+  app.get("/api/salla/products", async (req, res) => {
+    // Optional auth using secret key
+    const authHeader = req.headers.authorization;
+    if (authHeader !== `Bearer ${SALLA_SECRET_KEY}`) {
+      // we can optionally reject or allow if they don't send it, but let's enforce it since keys were provided
+      return res.status(401).json({ error: "Unauthorized Salla Partner" });
+    }
+
+    try {
+      const pendingProducts = await db.select().from(uploadedProducts)
+        .where(eq(uploadedProducts.isSynced, false))
+        .orderBy(desc(uploadedProducts.uploadedAt));
+      res.json({ success: true, count: pendingProducts.length, data: pendingProducts });
+    } catch (e: any) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  // Salla Webhook / Callback to mark as synced
+  app.post("/api/salla/webhook/sync", async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (authHeader !== `Bearer ${SALLA_SECRET_KEY}`) {
+      return res.status(401).json({ error: "Unauthorized Salla Partner" });
+    }
+
+    try {
+      const { id } = req.body; // array of IDs or single ID
+      if (!id) return res.status(400).json({ error: "Product id(s) required" });
+
+      const ids = Array.isArray(id) ? id : [id];
+      const results = [];
+      for (const prodId of ids) {
+        const updated = await db.update(uploadedProducts)
+          .set({ isSynced: true, syncedAt: new Date() })
+          .where(eq(uploadedProducts.id, parseInt(prodId)))
+          .returning();
+        if (updated.length > 0) results.push(updated[0]);
+      }
+      res.json({ success: true, syncedCount: results.length, data: results });
+    } catch (e: any) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
 
   app.post("/api/generate", async (req, res) => {
     try {
@@ -182,6 +457,20 @@ export async function registerRoutes(
         });
       }
 
+      // Perform OCR if key is available
+      let ocrText = "";
+      const cloudVisionKey = process.env.CLOUD_VISION_API_KEY;
+
+      if (cloudVisionKey) {
+        console.log("Performing Cloud Vision OCR...");
+        const [frontOCR, backOCR] = await Promise.all([
+          performOCR(frontBuffer, cloudVisionKey),
+          performOCR(backBuffer, cloudVisionKey)
+        ]);
+        ocrText = `\n\n[DETECTED TEXT FROM IMAGE (CLOUD VISION OCR)]:\nFront Image Text: ${frontOCR}\nBack Image Text: ${backOCR}\n\n⚠️ IMPORTANT: Verify the Model Number against the text above. If the image says 'G30', do NOT output 'G20'.`;
+        console.log("OCR Match Result:", ocrText);
+      }
+
       const ai = new GoogleGenAI({
         apiKey: geminiApiKey,
         httpOptions: baseUrl ? {
@@ -191,13 +480,12 @@ export async function registerRoutes(
       });
 
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-flash-latest",
         contents: [
           {
             role: "user",
             parts: [
-              { text: smartAnalysisPrompt },
-              { text: "الصورة الأمامية للمنتج:" },
+              { text: smartAnalysisPrompt + ocrText },
               { inlineData: { mimeType: "image/jpeg", data: processedFrontBase64 } },
               { text: "الصورة الخلفية للمنتج (الباركود والمواصفات):" },
               { inlineData: { mimeType: "image/jpeg", data: processedBackBase64 } },
@@ -217,13 +505,20 @@ export async function registerRoutes(
 
       let productData: ProductData;
       try {
-        const jsonContent = content.replace(/```json\n?|\n?```/g, "").trim();
+        // Robust JSON extraction
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+          throw new Error("No JSON object found in response");
+        }
+
+        const jsonContent = jsonMatch[0];
         productData = productDataSchema.parse(JSON.parse(jsonContent));
       } catch (parseError) {
-        console.error("Parse error:", parseError, "Content:", content);
+        console.error("Parse error:", parseError);
+        console.error("Raw content that failed parsing:", content);
         return res.status(500).json({
           success: false,
-          error: "Failed to parse AI response",
+          error: "Failed to parse AI response. Please try again.",
         });
       }
 
@@ -282,25 +577,28 @@ export async function registerRoutes(
           "jbl.com",
           "harmankardon.com",
           "bose.com",
+          "amazon.ae",
+          "m.media-amazon.ae",
+          "nooncdn.com",
+          "f.nooncdn.com",
         ];
 
         try {
           const imageUrl = new URL(productData.product_image_url);
-          const hostname = imageUrl.hostname.toLowerCase();
-          const isTrusted = imageUrl.protocol === "https:" && 
-            trustedImageDomains.some(domain => hostname === domain || hostname.endsWith("." + domain));
-          
-          if (!isTrusted) {
-            console.log("Rejected untrusted image URL:", productData.product_image_url);
+          // Allow any HTTPS URL for now to increase hit rate, since we verify content-type anyway
+          const isHttps = imageUrl.protocol === "https:";
+
+          if (!isHttps) {
+            console.log("Rejected non-HTTPS image URL:", productData.product_image_url);
             productData.product_image_url = "";
           } else {
             // Verify the image URL is actually accessible and returns an image
             try {
-              console.log("Verifying image URL:", productData.product_image_url);
+              console.log("Verifying AI image URL:", productData.product_image_url);
               const controller = new AbortController();
-              const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
-              
-              const imageResponse = await fetch(productData.product_image_url, {
+              const timeoutId = setTimeout(() => controller.abort(), 4000); // 4 seconds
+
+              let imageResponse = await fetch(productData.product_image_url, {
                 method: "HEAD",
                 signal: controller.signal,
                 headers: {
@@ -308,11 +606,24 @@ export async function registerRoutes(
                   "Accept": "image/*,*/*;q=0.8",
                 },
               });
-              
-              clearTimeout(timeoutId);
-              
+
               if (!imageResponse.ok) {
-                console.log("Image URL not accessible (status:", imageResponse.status, "):", productData.product_image_url);
+                console.log("AI Image HEAD failed, trying GET:", productData.product_image_url);
+                imageResponse = await fetch(productData.product_image_url, {
+                  method: "GET",
+                  signal: controller.signal,
+                  headers: {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                    "Accept": "image/*",
+                    "Range": "bytes=0-1024",
+                  },
+                });
+              }
+
+              clearTimeout(timeoutId);
+
+              if (!imageResponse.ok) {
+                console.log("AI Image URL not accessible (status:", imageResponse.status, "):", productData.product_image_url);
                 productData.product_image_url = "";
               } else {
                 const contentType = imageResponse.headers.get("content-type") || "";
@@ -320,12 +631,19 @@ export async function registerRoutes(
                   console.log("URL does not return an image (content-type:", contentType, "):", productData.product_image_url);
                   productData.product_image_url = "";
                 } else {
-                  console.log("Image URL verified successfully:", productData.product_image_url);
+                  console.log("AI Image URL verified successfully:", productData.product_image_url);
                 }
               }
             } catch (fetchError: any) {
-              console.log("Failed to verify image URL:", fetchError.message, productData.product_image_url);
-              productData.product_image_url = "";
+              console.log("Failed to verify AI image URL:", fetchError.message, productData.product_image_url);
+              // Don't clear URL on timeout if it looks like a valid major domain
+              const hostname = imageUrl.hostname.toLowerCase();
+              const highlyTrusted = ["amazon.com", "media-amazon.com", "samsung.com", "apple.com", "gsmarena.com", "noon.com"];
+              if (highlyTrusted.some(d => hostname.includes(d))) {
+                console.log("Keeping URL despite verification error as it is from a highly trusted source");
+              } else {
+                productData.product_image_url = "";
+              }
             }
           }
         } catch {
@@ -333,12 +651,106 @@ export async function registerRoutes(
           productData.product_image_url = "";
         }
       }
+
+      // Always perform image search to get multiple angles/options
+      console.log("Performing image search for multiple angles...");
+
+      // Build a clean search query: Brand + Model + "product white background"
+      const cleanBrand = productData.brand || "";
+      const cleanName = productData.product_name || "";
+      const searchQuery = `${cleanName} ${cleanBrand} official white background product`.replace(/\s+/g, ' ').trim();
+
+      const foundImages = await findProductImages(searchQuery);
+
+      if (foundImages.length > 0) {
+        // If we found images via search
+        if (!productData.product_image_url) {
+          // If AI didn't provide one, use the first search result
+          productData.product_image_url = foundImages[0];
+        } else {
+          // If AI provided one, ensure it's in the list if it's not already
+          if (!foundImages.includes(productData.product_image_url)) {
+            // Add AI image to the beginning if verified, otherwise just trust search
+            foundImages.unshift(productData.product_image_url);
+          }
+        }
+
+        productData.images = foundImages;
+        console.log(`Total images found: ${foundImages.length}`);
+      } else if (productData.product_name_en) {
+        // Try English name if Arabic search fails
+        console.log("Trying fallback search with English name...");
+        const cleanNameEn = productData.product_name_en.replace(/box|packaging|retail/gi, "").trim();
+        const searchQueryEn = `${cleanNameEn} product white background`;
+        const foundImagesEn = await findProductImages(searchQueryEn);
+
+        if (foundImagesEn.length > 0) {
+          if (!productData.product_image_url) {
+            productData.product_image_url = foundImagesEn[0];
+          } else if (!foundImagesEn.includes(productData.product_image_url)) {
+            foundImagesEn.unshift(productData.product_image_url);
+          }
+          productData.images = foundImagesEn;
+          console.log(`Total images found (English search): ${foundImagesEn.length}`);
+        }
+      }
+
+      // Ensure images array exists even if empty
+      if (!productData.images) {
+        productData.images = productData.product_image_url ? [productData.product_image_url] : [];
+      }
+
+      // Generate SKU if not provided by AI
+      if (!productData.sku || productData.sku.trim() === "") {
+        // Generate SKU from barcode if available, otherwise from brand + random
+        if (productData.barcode) {
+          productData.sku = `SKU-${productData.barcode.slice(-8)}`;
+        } else {
+          const brandPrefix = productData.brand_en?.substring(0, 3).toUpperCase() || "PRD";
+          const randomSuffix = Math.random().toString(36).substring(2, 8).toUpperCase();
+          productData.sku = `${brandPrefix}-${randomSuffix}`;
+        }
+        console.log(`Generated SKU: ${productData.sku}`);
+      }
+
+      // Save images to local files for direct links
+      const hostUrl = `${req.protocol}://${req.get('host')}`;
+      const frontFilename = `front_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
+      const backFilename = `back_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
+      const frontPath = path.join(process.cwd(), "attached_assets", "uploads", frontFilename);
+      const backPath = path.join(process.cwd(), "attached_assets", "uploads", backFilename);
       
+      fs.writeFileSync(frontPath, frontBuffer);
+      fs.writeFileSync(backPath, backBuffer);
+
+      const frontImageUrl = `${hostUrl}/uploads/${frontFilename}`;
+      const backImageUrl = `${hostUrl}/uploads/${backFilename}`;
+
+      // Insert into our Database
+      try {
+        await db.insert(uploadedProducts).values({
+          productName: productData.product_name || "Unknown Product",
+          sku: productData.sku,
+          barcode: productData.barcode,
+          frontImageUrl,
+          backImageUrl,
+          productData: productData,
+        });
+        console.log("Product saved to database.");
+      } catch (dbErr) {
+        console.error("Failed to save product to DB:", dbErr);
+        // We do not fail the request if DB insert fails
+      }
+
       return res.json({
         success: true,
         data: productData,
         frontImageBase64: processedFrontBase64,
         backImageBase64: processedBackBase64,
+        directLinks: {
+          front: frontImageUrl,
+          back: backImageUrl
+        }
       });
     } catch (error: any) {
       console.error("Generation error:", error);
@@ -359,34 +771,34 @@ export async function registerRoutes(
 
       const validationResult = productDataSchema.safeParse(productData);
       if (!validationResult.success) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: "Invalid product data format",
-          details: validationResult.error.errors 
+          details: validationResult.error.errors
         });
       }
 
       const validatedData = validationResult.data;
 
       const templatePath = path.join(process.cwd(), "attached_assets", "Salla_Products_Template_1765491101794.xlsx");
-      
+
       const workbook = new ExcelJS.Workbook();
-      
+
       if (fs.existsSync(templatePath)) {
         await workbook.xlsx.readFile(templatePath);
         const worksheet = workbook.worksheets[0];
-        
+
         if (worksheet) {
           const newRowNumber = worksheet.rowCount + 1;
           const newRow = worksheet.getRow(newRowNumber);
-          
+
           const normalFont = { strike: false, bold: false };
-          
+
           const setCellValue = (cellNum: number, value: string | number) => {
             const cell = newRow.getCell(cellNum);
             cell.value = value;
             cell.font = normalFont;
           };
-          
+
           setCellValue(1, "منتج");
           setCellValue(2, validatedData.product_name);
           setCellValue(3, validatedData.category);
@@ -396,7 +808,7 @@ export async function registerRoutes(
           setCellValue(7, 0);
           setCellValue(8, validatedData.full_description);
           setCellValue(9, "نعم");
-          setCellValue(10, validatedData.sku_barcode);
+          setCellValue(10, validatedData.sku);
           setCellValue(11, 0);
           setCellValue(12, "");
           setCellValue(13, "");
@@ -409,13 +821,13 @@ export async function registerRoutes(
           setCellValue(20, validatedData.brand);
           setCellValue(21, "");
           setCellValue(22, "");
-          setCellValue(23, validatedData.sku_barcode);
+          setCellValue(23, validatedData.barcode);
           setCellValue(24, "");
           setCellValue(25, "");
           setCellValue(26, "");
           setCellValue(27, "نعم");
           setCellValue(28, "");
-          
+
           newRow.commit();
         }
       } else {
@@ -468,7 +880,7 @@ export async function registerRoutes(
           0,
           validatedData.full_description || "",
           "نعم",
-          validatedData.sku_barcode || "",
+          validatedData.sku || "",
           0,
           "",
           "",
@@ -481,7 +893,7 @@ export async function registerRoutes(
           validatedData.brand || "",
           "",
           "",
-          validatedData.sku_barcode || "",
+          validatedData.barcode || "",
           "",
           "",
           "",
@@ -496,8 +908,8 @@ export async function registerRoutes(
         });
       }
 
-      const filename = validatedData.sku_barcode 
-        ? `salla-product-${validatedData.sku_barcode}.xlsx`
+      const filename = validatedData.sku
+        ? `salla-product-${validatedData.sku}.xlsx`
         : "salla-product-listing.xlsx";
 
       res.setHeader(
@@ -506,7 +918,7 @@ export async function registerRoutes(
       );
       res.setHeader(
         "Content-Disposition",
-        `attachment; filename=${filename}`
+        `attachment; filename="${filename}"`
       );
 
       await workbook.xlsx.write(res);
@@ -531,7 +943,7 @@ export async function registerRoutes(
 
       // Remove base64 prefix first for accurate size calculation
       const cleanBase64ForSize = imageBase64.replace(/^data:image\/\w+;base64,/, "");
-      
+
       // Decode base64 and check actual binary size
       let decodedBuffer: Buffer;
       try {
@@ -542,7 +954,7 @@ export async function registerRoutes(
           error: "Invalid image data",
         });
       }
-      
+
       const maxSize = 10 * 1024 * 1024; // 10MB
       if (decodedBuffer.length > maxSize) {
         return res.status(400).json({
@@ -715,11 +1127,11 @@ export async function registerRoutes(
           /^fc00:/i,                   // IPv6 unique local
           /^fd/i,                      // IPv6 unique local
         ];
-        
-        const hasPrivateIP = addresses.some((addr: { address: string }) => 
+
+        const hasPrivateIP = addresses.some((addr: { address: string }) =>
           privateIPRanges.some(range => range.test(addr.address))
         );
-        
+
         if (hasPrivateIP) {
           return res.json({
             success: false,
@@ -736,13 +1148,30 @@ export async function registerRoutes(
       }
 
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 5000);
+      const timeout = setTimeout(() => controller.abort(), 6000);
 
       try {
-        const response = await fetch(url, { 
+        console.log(`[Verify API] Trying HEAD: ${url}`);
+        let response = await fetch(url, {
           method: "HEAD",
           signal: controller.signal,
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          }
         });
+
+        if (!response.ok) {
+          console.log(`[Verify API] HEAD failed, trying GET: ${url}`);
+          response = await fetch(url, {
+            method: "GET",
+            signal: controller.signal,
+            headers: {
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+              "Range": "bytes=0-1024",
+            }
+          });
+        }
+
         clearTimeout(timeout);
 
         const contentType = response.headers.get("content-type") || "";
@@ -755,6 +1184,8 @@ export async function registerRoutes(
           });
         }
 
+        // If it's a trusted domain and we got a timeout or slightly weird response, maybe just allow it?
+        // Actually, if we're here, HEAD and GET failed. 
         return res.json({
           success: false,
           valid: false,
@@ -762,6 +1193,15 @@ export async function registerRoutes(
         });
       } catch (fetchError: any) {
         clearTimeout(timeout);
+        // Be very lenient for trusted domains if they timeout
+        if (isTrusted && (fetchError.name === "AbortError" || fetchError.message.includes("timeout"))) {
+          return res.json({
+            success: true,
+            valid: true, // Mark as valid (low confidence) since it's a trusted domain
+            warning: "Verification timed out, but domain is trusted",
+          });
+        }
+
         return res.json({
           success: false,
           valid: false,
@@ -774,6 +1214,259 @@ export async function registerRoutes(
         valid: false,
         reason: "Verification failed",
       });
+    }
+  });
+
+
+  // Download image proxy
+  app.get("/api/download-image", async (req, res) => {
+    try {
+      const imageUrl = req.query.url as string;
+
+      if (!imageUrl) {
+        return res.status(400).send("Image URL is required");
+      }
+
+      // Reuse the trusted domain logic
+      const trustedDomains = [
+        "gsmarena.com",
+        "fdn.gsmarena.com",
+        "fdn2.gsmarena.com",
+        "cdn.gsmarena.com",
+        "amazon.com",
+        "m.media-amazon.com",
+        "images-na.ssl-images-amazon.com",
+        "images-eu.ssl-images-amazon.com",
+        "noon.com",
+        "f.nooncdn.com",
+        "samsung.com",
+        "images.samsung.com",
+        "image-us.samsung.com",
+        "apple.com",
+        "store.storeimages.cdn-apple.com",
+        "xiaomi.com",
+        "i01.appmifile.com",
+        "i02.appmifile.com",
+        "oppo.com",
+        "image.oppo.com",
+        "vivo.com",
+        "realme.com",
+        "infinixmobility.com",
+        "tecno-mobile.com",
+        "oneplus.com",
+        "opc.img.shopping.com",
+        "cdn.shopify.com",
+        "static.wixstatic.com",
+        "aliexpress.com",
+        "ae01.alicdn.com",
+        "ae02.alicdn.com",
+        "ae03.alicdn.com",
+        "alicdn.com",
+        "jarir.com",
+        "extra.com",
+        "sharafdg.com",
+        "huawei.com",
+        "consumer.huawei.com",
+        "img.huaweicloud.com",
+        "honor.com",
+        "hihonor.com",
+        "motorola.com",
+        "nokia.com",
+        "sony.com",
+        "lg.com",
+        "lenovo.com",
+        "asus.com",
+        "anker.com",
+        "jbl.com",
+        "harmankardon.com",
+        "bose.com",
+        "imgbb.com",
+        "i.ibb.co",
+      ];
+
+      let parsedUrl: URL;
+      try {
+        parsedUrl = new URL(imageUrl);
+      } catch {
+        return res.status(400).send("Invalid URL");
+      }
+
+      const hostname = parsedUrl.hostname.toLowerCase();
+      const isTrusted = trustedDomains.some(
+        (domain) => hostname === domain || hostname.endsWith("." + domain)
+      );
+
+      if (parsedUrl.protocol !== "https:" || !isTrusted) {
+        return res.status(403).send("URL not from trusted source");
+      }
+
+      const response = await fetch(imageUrl, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        },
+      });
+
+      if (!response.ok) {
+        return res.status(response.status).send("Failed to fetch image");
+      }
+
+      const contentType = response.headers.get("content-type");
+      if (contentType) {
+        res.setHeader("Content-Type", contentType);
+      }
+
+      // Extract filename from URL or default
+      const pathname = parsedUrl.pathname;
+      const filename = path.basename(pathname) || "product-image.jpg";
+
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+
+      res.send(buffer);
+    } catch (error) {
+      console.error("Download proxy error:", error);
+      res.status(500).send("Failed to process download");
+    }
+  });
+
+  app.post("/api/download-zid", async (req, res) => {
+    try {
+      const { productData } = req.body;
+
+      if (!productData) {
+        return res.status(400).json({ error: "Product data is required" });
+      }
+
+      const validationResult = productDataSchema.safeParse(productData);
+      if (!validationResult.success) {
+        return res.status(400).json({
+          error: "Invalid product data format",
+          details: validationResult.error.errors
+        });
+      }
+
+      const validatedData = validationResult.data;
+      const templatePath = path.join(process.cwd(), "attached_assets", "import_products_example_2025-zid.xlsx");
+
+      const workbook = new ExcelJS.Workbook();
+
+      if (fs.existsSync(templatePath)) {
+        await workbook.xlsx.readFile(templatePath);
+        const worksheet = workbook.worksheets[0];
+
+        if (worksheet) {
+          // Clear example products starting from Row 3 to Row 15 to ensure a clean file
+          for (let i = 3; i <= 15; i++) {
+            worksheet.getRow(i).values = [];
+          }
+
+          const targetRowNumber = 3;
+          const targetRow = worksheet.getRow(targetRowNumber);
+          const normalFont = { strike: false, bold: false };
+
+          const setCellValue = (cellNum: number, value: string | number) => {
+            const cell = targetRow.getCell(cellNum);
+            cell.value = value;
+            cell.font = normalFont;
+          };
+
+          // Mapping based on Row 2 of Zid template (exactly 33 columns for the main data part)
+          setCellValue(1, validatedData.sku);
+          setCellValue(2, validatedData.product_name);
+          setCellValue(3, validatedData.product_name_en || "");
+          setCellValue(4, "kg");
+          setCellValue(5, 0.1);
+          setCellValue(6, 0); // price
+          setCellValue(7, 0); // sale_price
+          setCellValue(8, 0); // cost
+          setCellValue(9, 100); // quantity
+          setCellValue(10, validatedData.category);
+          setCellValue(11, validatedData.category_en || "");
+          setCellValue(12, validatedData.seo_description || ""); // categories_description_ar
+          setCellValue(13, validatedData.seo_description_en || ""); // categories_description_en
+          setCellValue(14, ""); // categories_images
+          setCellValue(15, "1"); // published
+
+          // Zid supports comma separated image URLs
+          const allImages = (validatedData.images && validatedData.images.length > 0)
+            ? validatedData.images.join(",")
+            : (validatedData.product_image_url || "");
+          setCellValue(16, allImages);
+          setCellValue(17, validatedData.product_name); // images_alt_text
+          setCellValue(18, "0"); // vat_free (0 = No)
+          setCellValue(19, 1); // minimum_quantity_per_order
+          setCellValue(20, 100); // maximum_quantity_per_order
+          setCellValue(21, "نعم"); // shipping_required (Yes)
+          setCellValue(22, validatedData.barcode || "");
+          setCellValue(23, validatedData.brand || ""); // keywords (or tags)
+          setCellValue(24, validatedData.full_description); // description_ar
+          setCellValue(25, validatedData.full_description_en || ""); // description_en
+          setCellValue(26, validatedData.marketing_description); // short_description_ar
+          setCellValue(27, validatedData.marketing_description_en || ""); // short_description_en
+          setCellValue(28, validatedData.seo_title || ""); // product_page_title_ar
+          setCellValue(29, validatedData.seo_title || ""); // product_page_title_en
+          setCellValue(30, validatedData.seo_description || ""); // product_page_description_ar
+          setCellValue(31, validatedData.seo_description_en || ""); // product_page_description_en
+          setCellValue(32, ""); // product_page_url
+          setCellValue(33, "لا"); // has_variants (No)
+
+        }
+      } else {
+        // Fallback if template doesn't exist
+        const worksheet = workbook.addWorksheet("Zid Products", {
+          views: [{ rightToLeft: true }],
+        });
+
+        // Simplified headers for Zid if template is missing
+        const headers = [
+          "sku", "name_ar", "name_en", "weight_unit", "weight", "price", "sale_price", "cost", "quantity",
+          "categories_ar", "categories_en", "description_ar", "description_en", "barcode", "images"
+        ];
+
+        worksheet.addRow(headers);
+        worksheet.getRow(1).font = { bold: true };
+
+        const dataRow = [
+          validatedData.sku,
+          validatedData.product_name,
+          validatedData.product_name_en || "",
+          "kg",
+          0.1,
+          0,
+          "",
+          "",
+          0,
+          validatedData.category,
+          validatedData.category_en || "",
+          validatedData.full_description,
+          validatedData.full_description_en || "",
+          validatedData.barcode,
+          validatedData.product_image_url || "",
+        ];
+
+        worksheet.addRow(dataRow);
+      }
+
+      const filename = validatedData.sku
+        ? `zid-product-${validatedData.sku}.xlsx`
+        : "zid-product-listing.xlsx";
+
+      res.setHeader(
+        "Content-Type",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      );
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${filename}"`
+      );
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      res.send(buffer);
+    } catch (error: any) {
+      console.error("Zid Excel generation error:", error);
+      return res.status(500).json({ error: "Failed to generate Zid Excel file" });
     }
   });
 
