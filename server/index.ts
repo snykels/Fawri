@@ -4,6 +4,7 @@ import { serveStatic } from "./static";
 import { createServer } from "http";
 import fs from "fs";
 import path from "path";
+import Database from "better-sqlite3";
 
 // Manually load .env file
 console.log("APP STARTING...");
@@ -27,9 +28,9 @@ if (fs.existsSync(envPath)) {
 // Manual database initialization for production environments
 const dbPath = path.resolve(APP_ROOT, "sqlite.db");
 console.log("Initializing database at:", dbPath);
-const sqlite = new (await import("better-sqlite3")).default(dbPath);
+const sqliteInit = new Database(dbPath);
 
-sqlite.exec(`
+sqliteInit.exec(`
   CREATE TABLE IF NOT EXISTS uploaded_products (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     product_name TEXT NOT NULL,
@@ -54,7 +55,7 @@ sqlite.exec(`
   );
 `);
 console.log("Database initialized successfully.");
-sqlite.close();
+sqliteInit.close();
 
 const app = express();
 const httpServer = createServer(app);

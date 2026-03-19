@@ -1,7 +1,7 @@
-node_modules
-dist
+# node_modules
+# dist
 .DS_Store
-server/public
+# server/public
 vite.config.ts.*
 *.tar.gz.env
 
@@ -9,3 +9,4 @@ vite.config.ts.*
 .env
 .env.*
 sqlite.db
+node_modules
