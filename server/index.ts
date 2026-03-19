@@ -6,12 +6,13 @@ import fs from "fs";
 import path from "path";
 
 // Manually load .env file
-console.log("APP STARTING - CWD:", process.cwd());
-console.log("DIRNAME:", __dirname);
+console.log("APP STARTING...");
 
-const envPath = path.resolve(process.cwd(), ".env");
+// Hardcoded absolute path for Hostinger environment
+const APP_ROOT = "/home/u551247625/domains/bisque-elk-518078.hostingersite.com/nodejs";
+const envPath = path.resolve(APP_ROOT, ".env");
+
 if (fs.existsSync(envPath)) {
-  console.log("Loading .env from:", envPath);
   const envConfig = fs.readFileSync(envPath, "utf-8");
   envConfig.split("\n").forEach((line) => {
     const match = line.match(/^([^=]+)=(.*)$/);
@@ -21,12 +22,10 @@ if (fs.existsSync(envPath)) {
       process.env[key] = value;
     }
   });
-} else {
-  console.log(".env NOT FOUND at:", envPath);
 }
 
 // Manual database initialization for production environments
-const dbPath = path.resolve(process.cwd(), "sqlite.db");
+const dbPath = path.resolve(APP_ROOT, "sqlite.db");
 console.log("Initializing database at:", dbPath);
 const sqlite = new (await import("better-sqlite3")).default(dbPath);
 
