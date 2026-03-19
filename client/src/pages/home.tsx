@@ -143,7 +143,7 @@ export default function Home() {
           const increment = Math.max(0.1, remaining * 0.05);
           return prev + increment;
         });
-      }, 200);
+      }, 2000); // Slower progress for better "feel"
     } else if (productData) {
       setProgress(100);
     } else {
@@ -153,6 +153,13 @@ export default function Home() {
       if (interval) clearInterval(interval);
     };
   }, [generateMutation.isPending, productData]);
+
+  // Auto-trigger analysis
+  useEffect(() => {
+    if (canGenerate && !productData && !generateMutation.isPending) {
+      generateMutation.mutate();
+    }
+  }, [canGenerate, productData, generateMutation]);
 
   const downloadMutation = useMutation({
     mutationFn: async () => {
@@ -297,17 +304,33 @@ export default function Home() {
                 />
               </div>
 
-              <div className="flex justify-center mt-12 mb-16">
-                <Button
-                  size="lg"
-                  className="bolt-button px-12 py-8 text-2xl gap-3 rounded-2xl font-black shadow-2xl shadow-primary/20 hover:scale-[1.02]"
-                  disabled={!canGenerate}
-                  onClick={() => generateMutation.mutate()}
-                  data-testid="button-generate"
-                >
-                  <ScanBarcode className="h-7 w-7" />
-                  {isEnglish ? "INITIATE ANALYSIS" : "تحليل وإضافة المنتج"}
-                </Button>
+              <div className="flex flex-col items-center justify-center mt-12 mb-16 gap-4">
+                <div className={`flex flex-col items-center gap-4 transition-all duration-500 ${canGenerate ? 'scale-110' : 'opacity-40 scale-100'}`}>
+                   <Button
+                    size="lg"
+                    className={`bolt-button px-16 py-10 text-2xl gap-4 rounded-[2.5rem] font-black shadow-2xl transition-all duration-500 ${canGenerate ? 'bg-primary shadow-primary/40 border-primary/20 scale-105' : 'bg-muted shadow-none border-transparent grayscale'}`}
+                    disabled={true} // Now automatic
+                  >
+                    {generateMutation.isPending ? (
+                      <Loader2 className="h-8 w-8 animate-spin" />
+                    ) : (
+                      <ScanBarcode className="h-8 w-8" />
+                    )}
+                    {generateMutation.isPending 
+                      ? (isEnglish ? "SENSING PRODUCT..." : "جاري الاستشعار...") 
+                      : (isEnglish ? "VISION READY" : "بانتظار الصور...")
+                    }
+                  </Button>
+                  {canGenerate && !generateMutation.isPending && (
+                    <motion.p 
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="text-primary font-black text-sm uppercase tracking-widest animate-pulse"
+                    >
+                      {isEnglish ? "Auto-Analysis Triggered" : "بداء التحليل التلقائي"}
+                    </motion.p>
+                  )}
+                </div>
               </div>
 
               <Card className="p-16 glass rounded-[3rem] shadow-2xl border-primary/5">

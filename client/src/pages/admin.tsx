@@ -348,66 +348,61 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                           </TableCell>
                         </TableRow>
                       ) : (
-                        <AnimatePresence>
-                          {products.map((p: any, idx: number) => (
-                            <motion.tr
+                        products.map((p: any, idx: number) => (
+                           <TableRow
                               key={p.id}
-                              initial={{ opacity: 0, x: isEnglish ? -10 : 10 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              transition={{ delay: idx * 0.05 + 0.5 }}
                               className="group border-primary/5 hover:bg-primary/5 transition-all"
                             >
-                              <TableCell className={`${isEnglish ? 'pl-8' : 'pr-8'} py-6`}>
+                              <TableCell className={`${isEnglish ? 'pl-8' : 'pr-8'} py-4`}>
                                 <div className="flex flex-col">
-                                  <span className="font-black text-foreground/90 uppercase text-xs">
+                                  <span className="font-black text-foreground/90 uppercase text-[10px]">
                                      {p.uploadedAt ? format(new Date(p.uploadedAt), "MMM dd, yyyy", { locale: isEnglish ? undefined : arSA }) : "-"}
                                   </span>
-                                  <span className="text-[10px] uppercase font-black text-primary/70 tracking-tighter">
+                                  <span className="text-[9px] uppercase font-black text-primary/70 tracking-tighter">
                                      {p.uploadedAt ? format(new Date(p.uploadedAt), "HH:mm:ss") : ""}
                                   </span>
                                 </div>
                               </TableCell>
-                              <TableCell className="text-center py-6">
+                              <TableCell className="text-center py-4">
                                 <div className="flex flex-col items-center gap-2">
                                   <Checkbox 
                                     checked={p.isSynced} 
-                                    className="w-6 h-6 border-primary/20 rounded-lg data-[state=checked]:bg-primary data-[state=checked]:border-primary transition-all hover:scale-110 shadow-lg"
+                                    className="w-5 h-5 border-primary/20 rounded-md data-[state=checked]:bg-primary data-[state=checked]:border-primary transition-all hover:scale-110 shadow-lg"
                                     onCheckedChange={(checked) => syncMutation.mutate({ id: p.id, isSynced: !!checked })} 
                                   />
                                   {p.isSynced ? (
-                                    <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 text-[9px] font-black tracking-widest px-2 uppercase">
+                                    <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 text-[8px] font-black tracking-widest px-1.5 py-0 uppercase">
                                        {isEnglish ? "Synced" : "تمت"}
                                     </Badge>
                                   ) : (
-                                    <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-amber-500/20 text-[9px] font-black tracking-widest px-2 uppercase">
+                                    <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-amber-500/20 text-[8px] font-black tracking-widest px-1.5 py-0 uppercase">
                                        {isEnglish ? "Pending" : "قيد"}
                                     </Badge>
                                   )}
                                 </div>
                               </TableCell>
-                              <TableCell className="py-6">
-                                <div className="max-w-[340px] truncate font-black text-lg text-foreground group-hover:text-primary transition-colors uppercase tracking-tight">
+                              <TableCell className="py-4">
+                                <div className="max-w-[300px] truncate font-black text-base text-foreground group-hover:text-primary transition-colors uppercase tracking-tight">
                                    {p.productName}
                                 </div>
-                                <div className="flex gap-3 items-center mt-2">
-                                  <code className="text-[9px] bg-primary/5 px-2 py-1 rounded-md border border-primary/10 font-bold text-primary transition-colors group-hover:bg-primary/10">SKU: {p.sku || "N/A"}</code>
-                                  <code className="text-[9px] bg-primary/5 px-2 py-1 rounded-md border border-primary/10 font-bold text-primary transition-colors group-hover:bg-primary/10">BARCODE: {p.barcode || "N/A"}</code>
+                                <div className="flex gap-2 items-center mt-1">
+                                  <code className="text-[8px] bg-primary/5 px-1.5 py-0.5 rounded-md border border-primary/10 font-bold text-primary">SKU: {p.sku || "N/A"}</code>
+                                  <code className="text-[8px] bg-primary/5 px-1.5 py-0.5 rounded-md border border-primary/10 font-bold text-primary">BARCODE: {p.barcode || "N/A"}</code>
                                 </div>
                               </TableCell>
-                              <TableCell className="py-6">
-                                <div className="flex items-center justify-center gap-3">
+                              <TableCell className="py-4">
+                                <div className="flex items-center justify-center gap-2">
                                   <Thumbnail url={p.frontImageUrl} label="Front" />
                                   <Thumbnail url={p.backImageUrl} label="Back" />
                                 </div>
                               </TableCell>
-                              <TableCell className={`text-right ${isEnglish ? 'pr-8' : 'pl-8'} py-6`}>
-                                <Button variant="ghost" size="sm" className="hover:bg-primary/10 hover:text-primary transition-all h-10 w-10 p-0 rounded-xl border border-transparent hover:border-primary/10" title="Inspect">
-                                  <Eye className="w-5 h-5" />
+                              <TableCell className={`text-right ${isEnglish ? 'pr-8' : 'pl-8'} py-4`}>
+                                <Button variant="ghost" size="sm" className="hover:bg-primary/10 hover:text-primary transition-all h-8 w-8 p-0 rounded-xl" title="Inspect">
+                                  <Eye className="w-4 h-4" />
                                 </Button>
                               </TableCell>
-                            </motion.tr>
-                          ))}
-                        </AnimatePresence>
+                            </TableRow>
+                        ))
                       )}
                     </TableBody>
                   </Table>
