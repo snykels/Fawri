@@ -19,6 +19,37 @@ if (fs.existsSync(envPath)) {
   });
 }
 
+// Manual database initialization for production environments
+const dbPath = path.resolve(process.cwd(), "sqlite.db");
+const sqlite = new (await import("better-sqlite3")).default(dbPath);
+
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS uploaded_products (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    product_name TEXT NOT NULL,
+    sku TEXT,
+    barcode TEXT,
+    front_image_url TEXT,
+    back_image_url TEXT,
+    is_synced INTEGER DEFAULT 0 NOT NULL,
+    uploaded_at INTEGER NOT NULL,
+    synced_at INTEGER,
+    product_data TEXT,
+    salla_product_id TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS salla_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    merchant_id TEXT,
+    access_token TEXT NOT NULL,
+    refresh_token TEXT NOT NULL,
+    expires_at INTEGER NOT NULL,
+    created_at INTEGER NOT NULL
+  );
+`);
+console.log("Database initialized successfully.");
+sqlite.close();
+
 const app = express();
 const httpServer = createServer(app);
 
