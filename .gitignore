@@ -8,3 +8,4 @@ vite.config.ts.*
 # Environment variables
 .env
 .env.*
+sqlite.db

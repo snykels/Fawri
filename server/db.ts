@@ -1,12 +1,9 @@
-import { Pool } from 'pg';
-import { drizzle } from 'drizzle-orm/node-postgres';
-import * as schema from '@shared/schema';
+import Database from "better-sqlite3";
+import { drizzle } from "drizzle-orm/better-sqlite3";
+import * as schema from "@shared/schema";
+import fs from "fs";
+import path from "path";
 
-if (!process.env.DATABASE_URL) {
-  // Gracefully handle missing db url for now by creating a mock or logging a warning, 
-  // but let's throw since we need it for this feature.
-  console.warn("DATABASE_URL is not set. Database features will not work.");
-}
-
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-export const db = drizzle(pool, { schema });
+const dbPath = path.join(process.cwd(), "sqlite.db");
+const sqlite = new Database(dbPath);
+export const db = drizzle(sqlite, { schema });

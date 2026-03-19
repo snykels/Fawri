@@ -11,11 +11,14 @@ export function Header() {
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             <img
-              src={theme === "dark" ? "/logo-dark-mode.png" : "/logo_full.png"}
-              alt="Salla PriceSense"
-              className="h-8 w-auto object-contain"
+              src={theme === "dark" ? "/logo-dark.png" : "/logo_light.png"}
+              alt="فوري Fawri"
+              className="h-10 w-auto object-contain"
             />
-            <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-[#5F3AF2] text-white rounded-md border border-white/20">
+            <span className="text-xl font-bold tracking-tight text-foreground hidden sm:block">
+              Fawri <span className="text-muted-foreground font-normal">| فوري</span>
+            </span>
+            <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-primary text-white rounded-md border border-white/20">
               Beta
             </span>
           </div>

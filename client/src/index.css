@@ -26,7 +26,8 @@
   --popover: 45 25% 97%;
   --popover-foreground: 0 0% 100%;
   --popover-border: 45 15% 92%;
-  --primary: 150 60% 45%;
+  --primary: 252 87% 59%;
+  /* Fawri Mauve #5F3AF2 */
   --primary-foreground: 0 0% 100%;
   --secondary: 0deg 0% 92.16%;
   --secondary-foreground: 0 0% 10.2%;
@@ -97,17 +98,17 @@
   --opaque-button-border-intensity: 9;
   --elevate-1: rgba(255, 255, 255, .04);
   --elevate-2: rgba(255, 255, 255, .09);
-  --background: 240 6% 4%;
-  /* #101114 */
+  --background: 223 39% 7%;
+  /* Fawri Navy #0b0f19 */
   --foreground: 210 40% 98%;
   /* High contrast white */
   --border: 240 4% 16%;
   /* rgba(255, 255, 255, 0.1) approx */
-  --card: 240 5% 12%;
-  /* #1E1E21 */
+  --card: 223 39% 10%;
+  /* Darker Fawri Navy */
   --card-foreground: 210 40% 98%;
   --card-border: 240 4% 20%;
-  --sidebar: 240 5% 12%;
+  --sidebar: 223 39% 10%;
   --sidebar-foreground: 210 40% 98%;
   --sidebar-border: 240 4% 20%;
   --sidebar-primary: 210 100% 53.5%;
@@ -116,11 +117,11 @@
   --sidebar-accent: 210 100% 50% / 0.1;
   --sidebar-accent-foreground: 210 100% 53.5%;
   --sidebar-ring: 210 100% 53.5%;
-  --popover: 240 6% 4%;
+  --popover: 223 39% 7%;
   --popover-foreground: 210 40% 98%;
   --popover-border: 240 4% 16%;
-  --primary: 210 100% 53.5%;
-  /* Bolt Blue #1488FC */
+  --primary: 252 87% 59%;
+  /* Fawri Mauve #5F3AF2 */
   --primary-foreground: 0 0% 100%;
   --secondary: 240 4% 25%;
   --secondary-foreground: 0 0% 100%;
@@ -175,8 +176,8 @@
   --destructive-border: hsl(from hsl(var(--destructive)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
   --glass-border: rgba(255, 255, 255, 0.1);
   --glow-opacity: 0.15;
-  --glow-color: 20, 136, 252;
-  /* Bolt Blue */
+  --glow-color: 95, 58, 242;
+  /* Fawri Mauve glow */
 }
 
 @layer base {

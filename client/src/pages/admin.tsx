@@ -67,7 +67,28 @@ export default function AdminPage() {
 }
 
 function AdminDashboard({ onLogout }: { onLogout: () => void }) {
+  const [token, setToken] = useState("");
   const { toast } = useToast();
+
+  const tokenMutation = useMutation({
+    mutationFn: async (t: string) => {
+      const res = await fetch("/api/salla/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: t })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || "Failed to save token");
+      return data;
+    },
+    onSuccess: () => {
+      toast({ title: "Salla Token saved successfully! Auto-upload is ready." });
+      setToken("");
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error saving token", description: err.message, variant: "destructive" });
+    }
+  });
 
   const { data, isLoading } = useQuery({
     queryKey: ["/api/admin/products"],
@@ -102,8 +123,26 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   return (
     <div className="min-h-screen bg-background p-6">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Product Admin Dashboard</h1>
-        <Button variant="outline" onClick={onLogout}>Logout</Button>
+        <h1 className="text-3xl font-bold">Fawri Admin Dashboard</h1>
+        <div className="flex gap-2 items-center">
+          <div className="flex bg-card items-center gap-2 border rounded-md px-2 py-1 shadow-sm">
+            <Input
+              type="password"
+              placeholder="Paste Salla Access Token (رمز الوصول)"
+              className="h-8 w-64 border-0 focus-visible:ring-0 text-sm"
+              value={token}
+              onChange={(e) => setToken(e.target.value)}
+            />
+            <Button
+              size="sm"
+              disabled={!token || tokenMutation.isPending}
+              onClick={() => tokenMutation.mutate(token)}
+            >
+              {tokenMutation.isPending ? "Saving..." : "Save Token"}
+            </Button>
+          </div>
+          <Button variant="outline" onClick={onLogout}>Logout</Button>
+        </div>
       </div>
       
       <div className="rounded-md border bg-card">

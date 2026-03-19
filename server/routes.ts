@@ -8,7 +8,7 @@ import fs from "fs";
 import { productDataSchema, type ProductData } from "@shared/schema";
 import { image_search } from "duckduckgo-images-api";
 import { db } from "./db";
-import { uploadedProducts } from "@shared/schema";
+import { uploadedProducts, sallaTokens } from "@shared/schema";
 import { eq, desc } from "drizzle-orm";
 import session from "express-session";
 import crypto from "crypto";
@@ -410,6 +410,31 @@ export async function registerRoutes(
     }
   });
 
+  // --- SALLA DIRECT TOKEN ROUTE ---
+  app.post("/api/salla/token", requireAdmin, async (req, res) => {
+    const { token } = req.body;
+    
+    if (!token || typeof token !== 'string') {
+      return res.status(400).json({ success: false, message: "A valid token is required" });
+    }
+
+    try {
+      // Direct insertion of Developer Access Token. 
+      // We set a long expiration date since Developer Tokens don't expire quickly
+      await db.insert(sallaTokens).values({
+        merchantId: "custom_app_store", // default identifier for custom apps
+        accessToken: token,
+        refreshToken: "", // Not needed for permanent developer tokens
+        expiresAt: new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000), // 10 years
+      });
+
+      res.json({ success: true, message: "Salla access token saved successfully." });
+    } catch (err: any) {
+      console.error("Error saving Salla token:", err);
+      res.status(500).json({ success: false, message: "Error saving token: " + err.message });
+    }
+  });
+
 
   app.post("/api/generate", async (req, res) => {
     try {
@@ -727,18 +752,66 @@ export async function registerRoutes(
       const backImageUrl = `${hostUrl}/uploads/${backFilename}`;
 
       // Insert into our Database
+      let productId = null;
       try {
-        await db.insert(uploadedProducts).values({
+        const inserted = await db.insert(uploadedProducts).values({
           productName: productData.product_name || "Unknown Product",
           sku: productData.sku,
           barcode: productData.barcode,
           frontImageUrl,
           backImageUrl,
           productData: productData,
-        });
-        console.log("Product saved to database.");
+        }).returning({ id: uploadedProducts.id });
+        if (inserted.length > 0) productId = inserted[0].id;
+        console.log("Product saved to database. ID:", productId);
+
+        // Attempt Salla auto-upload if token exists
+        if (productId) {
+          const tokens = await db.select().from(sallaTokens).orderBy(desc(sallaTokens.createdAt)).limit(1);
+          if (tokens.length > 0) {
+            console.log("Found Salla token, attempting auto-upload to Salla...");
+            
+            const reqImages = [];
+            if (productData.images && productData.images.length > 0) {
+              productData.images.slice(0, 4).forEach(url => reqImages.push({ original: url }));
+            }
+            if (frontImageUrl) reqImages.push({ original: frontImageUrl });
+            
+            const sallaPayload = {
+              name: productData.product_name || "Unknown Product",
+              price: 1, // Defaulting to 1 so the product can be created easily
+              status: "out_of_stock",
+              product_type: "product",
+              quantity: 0,
+              description: productData.full_description || productData.marketing_description || "",
+              sku: productData.sku,
+              barcode: productData.barcode,
+              images: reqImages.length > 0 ? reqImages : undefined
+            };
+
+            const uploadRes = await fetch("https://api.salla.dev/admin/v2/products", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${tokens[0].accessToken}`
+              },
+              body: JSON.stringify(sallaPayload)
+            });
+
+            if (uploadRes.ok) {
+              const uploadData = await uploadRes.json();
+              await db.update(uploadedProducts)
+                .set({ isSynced: true, syncedAt: new Date(), sallaProductId: uploadData.data?.id?.toString() })
+                .where(eq(uploadedProducts.id, productId));
+              console.log("Successfully auto-uploaded to Salla:", uploadData.data?.id);
+            } else {
+              const errData = await uploadRes.text();
+              console.error("Salla auto-upload API failed:", errData);
+            }
+          }
+        }
       } catch (dbErr) {
-        console.error("Failed to save product to DB:", dbErr);
+        console.error("Failed to save product to DB or Salla:", dbErr);
         // We do not fail the request if DB insert fails
       }
 

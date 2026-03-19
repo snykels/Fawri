@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { pgTable, text, serial, timestamp, boolean, json } from "drizzle-orm/pg-core";
+import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
 import { createInsertSchema } from "drizzle-zod";
 
 export const productDataSchema = z.object({
@@ -79,18 +79,31 @@ export const sallaExcelRowSchema = z.object({
 
 export type SallaExcelRow = z.infer<typeof sallaExcelRowSchema>;
 
-export const uploadedProducts = pgTable("uploaded_products", {
-  id: serial("id").primaryKey(),
+export const uploadedProducts = sqliteTable("uploaded_products", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   productName: text("product_name").notNull(),
   sku: text("sku"),
   barcode: text("barcode"),
   frontImageUrl: text("front_image_url"),
   backImageUrl: text("back_image_url"),
-  isSynced: boolean("is_synced").default(false).notNull(),
-  uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
-  syncedAt: timestamp("synced_at"),
-  productData: json("product_data"), // store the full generated JSON
+  isSynced: integer("is_synced", { mode: "boolean" }).default(false).notNull(),
+  uploadedAt: integer("uploaded_at", { mode: "timestamp" }).$defaultFn(() => new Date()).notNull(),
+  syncedAt: integer("synced_at", { mode: "timestamp" }),
+  productData: text("product_data", { mode: "json" }), // store the full generated JSON
+  sallaProductId: text("salla_product_id"),
 });
+
+export const sallaTokens = sqliteTable("salla_tokens", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  merchantId: text("merchant_id"),
+  accessToken: text("access_token").notNull(),
+  refreshToken: text("refresh_token").notNull(),
+  expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()).notNull(),
+});
+
+export const insertSallaTokenSchema = createInsertSchema(sallaTokens);
+export type SallaToken = typeof sallaTokens.$inferSelect;
 
 export const insertUploadedProductSchema = createInsertSchema(uploadedProducts);
 export type UploadedProduct = typeof uploadedProducts.$inferSelect;
