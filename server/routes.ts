@@ -318,9 +318,9 @@ export async function registerRoutes(
   }
   app.use("/uploads", express.static(uploadsDir));
 
-  // Salla Credentials from User Prompt
-  const SALLA_CLIENT_ID = "3b98cad1-c0ea-415c-9a98-f9288cc95365";
-  const SALLA_SECRET_KEY = "1ad23a9c67438be75908c28ba0ce500f294609933dfebc50d80a95cb0fc14ee0";
+  // Salla Credentials from Environment Variables or hardcoded fallbacks
+  const SALLA_CLIENT_ID = process.env.SALLA_CLIENT_ID || "3b98cad1-c0ea-415c-9a98-f9288cc95365";
+  const SALLA_SECRET_KEY = process.env.SALLA_SECRET_KEY || "1ad23a9c67438be75908c28ba0ce500f294609933dfebc50d80a95cb0fc14ee0";
 
   app.post("/api/admin/login", (req, res) => {
     const { username, password } = req.body;
