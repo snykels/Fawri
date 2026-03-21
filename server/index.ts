@@ -9,8 +9,14 @@ import Database from "better-sqlite3";
 // Manually load .env file
 console.log("APP STARTING...");
 
-// Hardcoded persistent absolute path for Hostinger environment
-const APP_ROOT = "/home/u551247625/fawri_data";
+// Hardcoded persistent absolute path for Hostinger environment with local fallback
+const APP_ROOT = process.env.DATABASE_DIR || path.resolve(process.cwd(), "fawri_data");
+
+// Ensure the directory exists
+if (!fs.existsSync(APP_ROOT)) {
+  fs.mkdirSync(APP_ROOT, { recursive: true });
+}
+
 const envPath = path.resolve(APP_ROOT, ".env");
 
 if (fs.existsSync(envPath)) {
@@ -139,7 +145,7 @@ app.use((req, res, next) => {
   // Other ports are firewalled. Default to 5000 if not specified.
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || "5000", 10);
+  const port = parseInt(process.env.PORT || "5001", 10);
   httpServer.listen(
     {
       port,

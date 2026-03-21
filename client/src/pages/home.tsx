@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
+import { motion } from "framer-motion";
 import { Header } from "@/components/header";
 import { ImageUploadCard } from "@/components/image-upload-card";
 import { Button } from "@/components/ui/button";
@@ -51,6 +52,8 @@ export default function Home() {
   const { toast } = useToast();
 
   const [progress, setProgress] = useState(0);
+
+  const canGenerate = frontImage && backImage;
 
   // Helper to get localized text
   const getText = (arField: string, enField: string | undefined) => {
@@ -156,10 +159,10 @@ export default function Home() {
 
   // Auto-trigger analysis
   useEffect(() => {
-    if (canGenerate && !productData && !generateMutation.isPending) {
+    if (canGenerate && !productData && !generateMutation.isPending && !generateMutation.isError) {
       generateMutation.mutate();
     }
-  }, [canGenerate, productData, generateMutation]);
+  }, [canGenerate, productData, generateMutation, canGenerate]);
 
   const downloadMutation = useMutation({
     mutationFn: async () => {
@@ -257,9 +260,8 @@ export default function Home() {
     setFrontImageBase64("");
     setCopiedUrl(false);
     setProgress(0);
+    generateMutation.reset();
   };
-
-  const canGenerate = frontImage && backImage;
 
   return (
     <div className="min-h-screen bg-background transition-colors duration-300 relative overflow-hidden font-sans">
@@ -308,20 +310,25 @@ export default function Home() {
                 <div className={`flex flex-col items-center gap-4 transition-all duration-500 ${canGenerate ? 'scale-110' : 'opacity-40 scale-100'}`}>
                    <Button
                     size="lg"
-                    className={`bolt-button px-16 py-10 text-2xl gap-4 rounded-[2.5rem] font-black shadow-2xl transition-all duration-500 ${canGenerate ? 'bg-primary shadow-primary/40 border-primary/20 scale-105' : 'bg-muted shadow-none border-transparent grayscale'}`}
-                    disabled={true} // Now automatic
+                    className={`bolt-button px-16 py-10 text-2xl gap-4 rounded-[2.5rem] font-black shadow-2xl transition-all duration-500 ${canGenerate ? (generateMutation.isError ? 'bg-destructive/20 border-destructive/50 text-destructive' : 'bg-primary shadow-primary/40 border-primary/20 scale-105') : 'bg-muted shadow-none border-transparent grayscale'}`}
+                    disabled={!generateMutation.isError && canGenerate} // Only clickable if error or manual
+                    onClick={() => generateMutation.isError && generateMutation.mutate()}
                   >
                     {generateMutation.isPending ? (
                       <Loader2 className="h-8 w-8 animate-spin" />
+                    ) : generateMutation.isError ? (
+                      <RefreshCw className="h-8 w-8" />
                     ) : (
                       <ScanBarcode className="h-8 w-8" />
                     )}
                     {generateMutation.isPending 
                       ? (isEnglish ? "SENSING PRODUCT..." : "جاري الاستشعار...") 
-                      : (isEnglish ? "VISION READY" : "بانتظار الصور...")
+                      : generateMutation.isError
+                        ? (isEnglish ? "RETRY VISION" : "إعادة المحاولة")
+                        : (isEnglish ? "VISION READY" : "بانتظار الصور...")
                     }
                   </Button>
-                  {canGenerate && !generateMutation.isPending && (
+                  {canGenerate && !generateMutation.isPending && !generateMutation.isError && (
                     <motion.p 
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
