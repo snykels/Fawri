@@ -11,15 +11,20 @@ console.log("APP STARTING...");
 
 // Hardcoded persistent absolute path for Hostinger environment with local fallback
 const APP_ROOT = process.env.DATABASE_DIR || path.resolve(process.cwd(), "fawri_data");
+console.log("APP_ROOT:", APP_ROOT);
+console.log("process.cwd():", process.cwd());
 
 // Ensure the directory exists
 if (!fs.existsSync(APP_ROOT)) {
+  console.log("Creating APP_ROOT directory...");
   fs.mkdirSync(APP_ROOT, { recursive: true });
 }
 
 const envPath = path.resolve(APP_ROOT, ".env");
+console.log("Checking for .env at:", envPath);
 
 if (fs.existsSync(envPath)) {
+  console.log(".env file FOUND, loading...");
   const envConfig = fs.readFileSync(envPath, "utf-8");
   envConfig.split("\n").forEach((line) => {
     const match = line.match(/^([^=]+)=(.*)$/);
@@ -27,8 +32,11 @@ if (fs.existsSync(envPath)) {
       const key = match[1].trim();
       const value = match[2].trim().replace(/^["']|["']$/g, ""); // Remove quotes if present
       process.env[key] = value;
+      console.log(`Loaded ${key} from .env`);
     }
   });
+} else {
+  console.log(".env file NOT FOUND at:", envPath);
 }
 
 // Manual database initialization for production environments
