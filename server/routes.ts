@@ -13,60 +13,13 @@ import { eq, desc } from "drizzle-orm";
 import session from "express-session";
 import createMemoryStore from "memorystore";
 import crypto from "crypto";
+import { getValidAccessToken, saveDeveloperToken } from "./salla-oauth";
+import { buildProductPrompt, imageAnalysisPrompt } from "./prompts";
 
 const MemoryStore = createMemoryStore(session);
 
-const smartAnalysisPrompt = `**أنت خبير منتجات ومحترف SEO.**
-مهمتك استخراج بيانات المنتج بدقة 100% من الصور والنصوص (OCR).
-
----
-
-## 📸 تعليمات البحث عن الصور ودقة الألوان:
-المستخدم يشتكي من "عدم العثور على صورة" أو ظهور "صورة الكرتون" أو "خطأ في اللون".
-1. **اللون (Color Accuracy):** استخرج لون المنتج الفعلي بعناية. إذا كان الجهاز أسود والخلفية بيضاء، فاللون هو **أسود**. لا تخطئ بين لون الخلفية أو الانعكاسات ولون المنتج.
-2. **اسم المنتج للبحث:** يجب أن يكون الاسم في حقل \`product_name\` هو اسم الجهاز/المنتج الفعلي فقط.
-3. **استبعاد التغليف:** استبعد أي كلمات تتعلق بالتغليف (الكرتون، Box، إلخ).
-4. **الجودة:** ابحث عن صور بخلفية بيضاء (White Background).
-
----
-
-## 📝 تعليمات المحتوى (Content Instructions):
-
-### 1. 🏷️ اسم المنتج (Product Name):
-- **يجب أن يكون بالعربي، واضحاً، وشاملاً للجهاز فقط.**
-- **الصيغة:** [الماركة] [الموديل] [السلسلة] - [السعة]، [الرام]، [اللون]
-- **مثال ممتاز:** موتورولا موتو G30 برو، 128 جيجا، 6 جيجا رام - لون أسود فلكي
-
----
-
-## 🔍 خطوات العمل:
-1. **OCR:** استخدم النص من Cloud Vision لتحديد الموديل بدقة.
-2. **اللون:** حدد اللون من الرؤية البصرية بتركيز عالي.
-3. **الاسم:** استخرج الاسم الصافي (Xiaomi 13 Pro وليس Xiaomi 13 Pro Box).
-
----
-
-## 📋 البيانات المطلوبة (JSON):
-{
-  "product_name": "[الماركة بالعربي] [الموديل] [السعة] - [اللون]",
-  "seo_title": "عنوان جذاب لمحركات البحث",
-  "seo_description": "وصف ميتا مختصر",
-  "marketing_description": "وصف تسويقي",
-  "full_description": "المقال التفصيلي المقسم (Markdown)",
-  "category": "التصنيف",
-  "brand": "الماركة",
-  "sku": "SKU",
-  "barcode": "Barcode",
-  "product_image_url": "",
-  "product_name_en": "Clean English Name",
-  "seo_description_en": "English SEO Description",
-  "marketing_description_en": "English Marketing Description",
-  "full_description_en": "English Full Description",
-  "category_en": "Category (English)",
-  "brand_en": "Brand (English)"
-}
-
-ابدأ التحليل...`;
+// استخدام البرومبت المحسّن من prompts.ts
+const smartAnalysisPrompt = imageAnalysisPrompt;
 
 interface CloudVisionResponse {
   responses: Array<{
@@ -416,7 +369,7 @@ export async function registerRoutes(
     }
   });
 
-  // --- SALLA DIRECT TOKEN ROUTE ---
+  // --- SALLA DIRECT TOKEN ROUTE (using OAuth2 service) ---
   app.post("/api/salla/token", requireAdmin, async (req, res) => {
     const { token } = req.body;
     
@@ -425,19 +378,59 @@ export async function registerRoutes(
     }
 
     try {
-      // Direct insertion of Developer Access Token. 
-      // We set a long expiration date since Developer Tokens don't expire quickly
-      await db.insert(sallaTokens).values({
-        merchantId: "custom_app_store", // default identifier for custom apps
-        accessToken: token,
-        refreshToken: "", // Not needed for permanent developer tokens
-        expiresAt: new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000), // 10 years
-      });
+      // استخدام خدمة OAuth2 لحفظ التوكن
+      await saveDeveloperToken(token, "custom_app_store");
 
       res.json({ success: true, message: "Salla access token saved successfully." });
     } catch (err: any) {
       console.error("Error saving Salla token:", err);
       res.status(500).json({ success: false, message: "Error saving token: " + err.message });
+    }
+  });
+
+  // --- SALLA OAUTH2 CALLBACK ROUTE ---
+  app.get("/api/salla/callback", async (req, res) => {
+    try {
+      const { code, state } = req.query;
+      
+      if (!code) {
+        return res.status(400).json({ success: false, message: "Authorization code is required" });
+      }
+
+      // استيراد دالة تبادل الكود
+      const { exchangeCodeForTokens } = await import("./salla-oauth");
+      
+      const tokens = await exchangeCodeForTokens(code as string, state as string);
+      
+      if (tokens) {
+        res.json({ 
+          success: true, 
+          message: "Salla OAuth2 tokens saved successfully. The system will automatically refresh tokens when needed." 
+        });
+      } else {
+        res.status(500).json({ success: false, message: "Failed to exchange authorization code for tokens" });
+      }
+    } catch (err: any) {
+      console.error("Salla OAuth2 callback error:", err);
+      res.status(500).json({ success: false, message: "OAuth2 callback failed: " + err.message });
+    }
+  });
+
+  // --- SALLA AUTHORIZATION URL ROUTE ---
+  app.get("/api/salla/auth-url", requireAdmin, async (req, res) => {
+    try {
+      const { getAuthorizationUrl } = await import("./salla-oauth");
+      const redirectUri = req.query.redirect_uri as string || `${req.protocol}://${req.get('host')}/api/salla/callback`;
+      const authUrl = getAuthorizationUrl(redirectUri);
+      
+      res.json({ 
+        success: true, 
+        authUrl,
+        message: "Redirect user to this URL to authorize the application"
+      });
+    } catch (err: any) {
+      console.error("Error generating auth URL:", err);
+      res.status(500).json({ success: false, message: "Failed to generate authorization URL" });
     }
   });
 
@@ -771,49 +764,56 @@ export async function registerRoutes(
         if (inserted.length > 0) productId = inserted[0].id;
         console.log("Product saved to database. ID:", productId);
 
-        // Attempt Salla auto-upload if token exists
+        // Attempt Salla auto-upload if token exists (using OAuth2 with auto-refresh)
         if (productId) {
-          const tokens = await db.select().from(sallaTokens).orderBy(desc(sallaTokens.createdAt)).limit(1);
-          if (tokens.length > 0) {
-            console.log("Found Salla token, attempting auto-upload to Salla...");
-            
-            const reqImages = [];
-            if (productData.images && productData.images.length > 0) {
-              productData.images.slice(0, 4).forEach(url => reqImages.push({ original: url }));
-            }
-            if (frontImageUrl) reqImages.push({ original: frontImageUrl });
-            
-            const sallaPayload = {
-              name: productData.product_name || "Unknown Product",
-              price: 1, // Defaulting to 1 so the product can be created easily
-              status: "out_of_stock",
-              product_type: "product",
-              quantity: 0,
-              description: productData.full_description || productData.marketing_description || "",
-              sku: productData.sku,
-              barcode: productData.barcode,
-              images: reqImages.length > 0 ? reqImages : undefined
-            };
+          try {
+            const accessToken = await getValidAccessToken();
+            if (accessToken) {
+              console.log("Found valid Salla token, attempting auto-upload to Salla...");
+              
+              const reqImages = [];
+              if (productData.images && productData.images.length > 0) {
+                productData.images.slice(0, 4).forEach(url => reqImages.push({ original: url }));
+              }
+              if (frontImageUrl) reqImages.push({ original: frontImageUrl });
+              
+              const sallaPayload = {
+                name: productData.product_name || "Unknown Product",
+                price: 1, // Defaulting to 1 so the product can be created easily
+                status: "out_of_stock",
+                product_type: "product",
+                quantity: 0,
+                description: productData.full_description || productData.marketing_description || "",
+                sku: productData.sku,
+                barcode: productData.barcode,
+                images: reqImages.length > 0 ? reqImages : undefined
+              };
 
-            const uploadRes = await fetch("https://api.salla.dev/admin/v2/products", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${tokens[0].accessToken}`
-              },
-              body: JSON.stringify(sallaPayload)
-            });
+              const uploadRes = await fetch("https://api.salla.dev/admin/v2/products", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Authorization": `Bearer ${accessToken}`
+                },
+                body: JSON.stringify(sallaPayload)
+              });
 
-            if (uploadRes.ok) {
-              const uploadData = await uploadRes.json();
-              await db.update(uploadedProducts)
-                .set({ isSynced: true, syncedAt: new Date(), sallaProductId: uploadData.data?.id?.toString() })
-                .where(eq(uploadedProducts.id, productId));
-              console.log("Successfully auto-uploaded to Salla:", uploadData.data?.id);
+              if (uploadRes.ok) {
+                const uploadData = await uploadRes.json();
+                await db.update(uploadedProducts)
+                  .set({ isSynced: true, syncedAt: new Date(), sallaProductId: uploadData.data?.id?.toString() })
+                  .where(eq(uploadedProducts.id, productId));
+                console.log("Successfully auto-uploaded to Salla:", uploadData.data?.id);
+              } else {
+                const errData = await uploadRes.text();
+                console.error("Salla auto-upload API failed:", errData);
+              }
             } else {
-              const errData = await uploadRes.text();
-              console.error("Salla auto-upload API failed:", errData);
+              console.log("No valid Salla token available for auto-upload");
             }
+          } catch (sallaErr) {
+            console.error("Salla auto-upload error:", sallaErr);
+            // Don't fail the request if Salla upload fails
           }
         }
       } catch (dbErr) {
