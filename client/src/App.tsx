@@ -7,6 +7,7 @@ import { ThemeProvider } from "@/lib/theme-provider";
 import { LanguageProvider } from "@/lib/language-provider";
 import Home from "@/pages/home";
 import AdminPage from "@/pages/admin";
+import PublishPage from "@/pages/publish";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -14,6 +15,7 @@ function Router() {
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/admin" component={AdminPage} />
+      <Route path="/publish" component={PublishPage} />
       <Route component={NotFound} />
     </Switch>
   );

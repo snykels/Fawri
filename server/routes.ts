@@ -1297,6 +1297,116 @@ export async function registerRoutes(
   });
 
 
+  // ============================================
+  // نقطة النشر المباشر على سلة (الجديدة)
+  // ============================================
+  
+  app.post("/api/publish-to-salla", async (req, res) => {
+    try {
+      const { productName, frontImage, backImage } = req.body;
+
+      if (!productName || typeof productName !== "string") {
+        return res.status(400).json({
+          success: false,
+          error: "اسم المنتج مطلوب",
+        });
+      }
+
+      console.log(`[Publish API] Received request for: ${productName}`);
+
+      // استيراد خدمة النشر
+      const { processAndPublish } = await import("./salla-publisher");
+
+      // معالجة الصور إذا تم توفيرها
+      let frontImageBase64: string | undefined;
+      let backImageBase64: string | undefined;
+
+      if (frontImage && typeof frontImage === "string") {
+        frontImageBase64 = frontImage.replace(/^data:image\/\w+;base64,/, "");
+      }
+
+      if (backImage && typeof backImage === "string") {
+        backImageBase64 = backImage.replace(/^data:image\/\w+;base64,/, "");
+      }
+
+      // تنفيذ العملية الكاملة
+      const result = await processAndPublish(
+        productName,
+        frontImageBase64,
+        backImageBase64
+      );
+
+      if (!result.success) {
+        return res.status(500).json({
+          success: false,
+          error: result.error || "فشلت عملية النشر",
+        });
+      }
+
+      return res.json({
+        success: true,
+        data: {
+          productName: result.productData?.productName,
+          seoTitle: result.productData?.seoTitle,
+          description: result.productData?.description,
+          sku: result.productData?.sku,
+          barcode: result.productData?.barcode,
+          images: result.productData?.images,
+          sallaProductId: result.sallaProductId,
+        },
+        message: "تم نشر المنتج على سلة بنجاح",
+      });
+    } catch (error: any) {
+      console.error("[Publish API] Error:", error);
+      return res.status(500).json({
+        success: false,
+        error: error.message || "حدث خطأ في عملية النشر",
+      });
+    }
+  });
+
+  // نقطة نهاية لتوليد المحتوى فقط (بدون نشر)
+  app.post("/api/generate-content", async (req, res) => {
+    try {
+      const { productName, ocrText } = req.body;
+
+      if (!productName || typeof productName !== "string") {
+        return res.status(400).json({
+          success: false,
+          error: "اسم المنتج مطلوب",
+        });
+      }
+
+      console.log(`[Generate API] Generating content for: ${productName}`);
+
+      // استيراد خدمة النشر
+      const { generateProductContent } = await import("./salla-publisher");
+
+      const result = await generateProductContent(
+        productName,
+        ocrText || ""
+      );
+
+      if (!result) {
+        return res.status(500).json({
+          success: false,
+          error: "فشل في توليد المحتوى",
+        });
+      }
+
+      return res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error: any) {
+      console.error("[Generate API] Error:", error);
+      return res.status(500).json({
+        success: false,
+        error: error.message || "حدث خطأ في توليد المحتوى",
+      });
+    }
+  });
+
   // Download image proxy
   app.get("/api/download-image", async (req, res) => {
     try {
