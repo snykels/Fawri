@@ -26,13 +26,22 @@ console.log("Checking for .env at:", envPath);
 if (fs.existsSync(envPath)) {
   console.log(".env file FOUND, loading...");
   const envConfig = fs.readFileSync(envPath, "utf-8");
-  envConfig.split("\n").forEach((line) => {
-    const match = line.match(/^([^=]+)=(.*)$/);
-    if (match) {
-      const key = match[1].trim();
-      const value = match[2].trim().replace(/^["']|["']$/g, ""); // Remove quotes if present
+  const lines = envConfig.split(/\r?\n/);
+  console.log(`Processing ${lines.length} lines from .env`);
+  
+  lines.forEach((line, index) => {
+    console.log(`[Line ${index + 1}] Raw: ${JSON.stringify(line)}`);
+    const trimmedLine = line.trim();
+    if (!trimmedLine || trimmedLine.startsWith("#")) return; 
+
+    const equalsIndex = trimmedLine.indexOf('=');
+    if (equalsIndex > 0) {
+      const key = trimmedLine.substring(0, equalsIndex).trim();
+      const value = trimmedLine.substring(equalsIndex + 1).trim().replace(/^["']|["']$/g, "");
       process.env[key] = value;
-      console.log(`Loaded ${key} from .env`);
+      console.log(`[Line ${index + 1}] Loaded: ${key}`);
+    } else {
+      console.log(`[Line ${index + 1}] Failed to parse: ${trimmedLine}`);
     }
   });
 } else {

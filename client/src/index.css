@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Alexandria:wght@100..900&display=swap');
+/* Fonts are loaded in index.html for better performance */
 
 @tailwind base;
 @tailwind components;
@@ -46,8 +46,8 @@
   --chart-3: 42.0290 92.8251% 56.2745%;
   --chart-4: 147.1429 78.5047% 41.9608%;
   --chart-5: 341.4894 75.2000% 50.9804%;
-  --font-sans: 'Alexandria', sans-serif;
-  --font-serif: 'IBM Plex Sans', sans-serif;
+  --font-sans: 'Cairo', 'Inter', system-ui, -apple-system, sans-serif;
+  --font-serif: 'Inter', sans-serif;
   --font-mono: Menlo, monospace;
   --radius: 0.6rem;
   --shadow-2xs: 0px 2px 0px 0px hsl(226 99% 63% / 0.00);
@@ -100,8 +100,7 @@
   --opaque-button-border-intensity: 9;
   --elevate-1: rgba(255, 255, 255, .04);
   --elevate-2: rgba(255, 255, 255, .09);
-  --background: 244 38% 14%;
-  /* New Dark Background #171531 */
+  --background: 240 40% 6%; /* Richer Dark #0f0f1b */
   --foreground: 210 40% 98%;
   --border: 244 30% 20%;
   --card: 244 38% 16%;

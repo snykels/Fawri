@@ -1,12 +1,8 @@
-import { ThemeToggle } from "./theme-toggle";
-import { Languages } from "lucide-react";
 import { useTheme } from "@/lib/theme-provider";
-import { useLanguage } from "@/lib/language-provider";
-import { Button } from "./ui/button";
+import { Settings } from "./Settings";
 
 export function Header() {
   const { theme } = useTheme();
-  const { language, toggleLanguage, isEnglish } = useLanguage();
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-primary/10 bg-background/60 backdrop-blur-xl transition-all duration-300">
@@ -14,9 +10,9 @@ export function Header() {
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-4">
             <img
-              src={theme === "dark" ? "/logo-dark.png" : "/logo_light.png"}
+              src={theme === "dark" || theme === "system" && typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches ? "/logo-dark.png" : "/logo_light.png"}
               alt="Fawri"
-              className="h-12 w-auto object-contain hover:scale-105 transition-transform cursor-pointer"
+              className="h-10 w-auto object-contain hover:scale-105 transition-transform cursor-pointer"
               onClick={() => window.location.href = '/'}
             />
             <div className="h-8 w-[1px] bg-primary/20 hidden sm:block" />
@@ -27,17 +23,7 @@ export function Header() {
         </div>
 
         <div className="flex items-center gap-3">
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="gap-2 font-bold hover:bg-primary/10 hover:text-primary transition-all rounded-xl border border-transparent hover:border-primary/10"
-            onClick={toggleLanguage}
-          >
-            <Languages className="h-4 w-4" />
-            {isEnglish ? "العربية" : "English"}
-          </Button>
-          <div className="h-6 w-[1px] bg-primary/10 mx-1" />
-          <ThemeToggle />
+          <Settings />
         </div>
       </div>
     </header>

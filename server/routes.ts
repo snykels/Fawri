@@ -478,6 +478,7 @@ export async function registerRoutes(
       const processedBackBase64 = backBuffer.toString("base64");
 
       let geminiApiKey = process.env.AI_INTEGRATIONS_GEMINI_API_KEY;
+      console.log("Gemini API key status:", geminiApiKey ? `FOUND (length: ${geminiApiKey.length})` : "NOT FOUND");
       let baseUrl = process.env.AI_INTEGRATIONS_GEMINI_BASE_URL;
       let apiVersion = "";
 
