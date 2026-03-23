@@ -10,16 +10,16 @@ export const productDataSchema = z.object({
   full_description: z.string().min(1, "الوصف الكامل مطلوب"),
   category: z.string().min(1, "التصنيف مطلوب"),
   brand: z.string().min(1, "الماركة مطلوبة"),
+  brand_en: z.string().optional().default(""),
   sku: z.string().optional().default(""),
   barcode: z.string().min(1, "الباركود مطلوب"),
   product_image_url: z.string().optional().default(""),
-  // English translations
   product_name_en: z.string().optional().default(""),
   seo_description_en: z.string().optional().default(""),
   marketing_description_en: z.string().optional().default(""),
   full_description_en: z.string().optional().default(""),
   category_en: z.string().optional().default(""),
-  brand_en: z.string().optional().default(""),
+  video_url: z.string().optional().default(""),
   images: z.array(z.string()).optional().default([]),
 });
 
