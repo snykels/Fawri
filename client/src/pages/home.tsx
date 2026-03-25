@@ -310,8 +310,8 @@ export default function Home() {
                 <div className={`flex flex-col items-center gap-4 transition-all duration-500 ${canGenerate ? 'scale-110' : 'opacity-40 scale-100'}`}>
                    <Button
                     size="lg"
-                    className={`bolt-button px-16 py-10 text-2xl gap-4 rounded-[2.5rem] font-black shadow-2xl transition-all duration-500 ${canGenerate ? (generateMutation.isError ? 'bg-destructive/20 border-destructive/50 text-destructive' : 'bg-primary shadow-primary/40 border-primary/20 scale-105') : 'bg-muted shadow-none border-transparent grayscale'}`}
-                    disabled={!generateMutation.isError && canGenerate} // Only clickable if error or manual
+                    className={`bolt-button px-16 py-10 text-2xl gap-4 rounded-[2.5rem] font-black shadow-2xl transition-all duration-500 border-2 ${canGenerate ? (generateMutation.isError ? 'bg-destructive/20 border-destructive/50 text-destructive' : 'bg-primary text-white shadow-primary/40 border-primary/20 scale-105') : 'bg-muted text-muted-foreground shadow-none border-transparent grayscale'}`}
+                    disabled={!generateMutation.isError && !!canGenerate} // Only clickable if error or manual
                     onClick={() => generateMutation.isError && generateMutation.mutate()}
                   >
                     {generateMutation.isPending ? (
@@ -451,8 +451,8 @@ export default function Home() {
                     <DataBox label={isEnglish ? "Product Identity" : "اسم المنتج"} value={getText(productData.product_name, productData.product_name_en)} dataTestId="text-product-name" big />
                     <DataBox label={isEnglish ? "Brand" : "الماركة"} value={getText(productData.brand, productData.brand_en)} dataTestId="text-brand" />
                     <DataBox label={isEnglish ? "Category" : "التصنيف"} value={getText(productData.category, productData.category_en)} dataTestId="text-category" />
-                    <DataBox label="BARCODE" value={productData.barcode} dataTestId="text-barcode" mono />
-                    <DataBox label="SKU" value={productData.sku} dataTestId="text-sku" mono primary />
+                    <DataBox label={isEnglish ? "BARCODE" : "الباركود"} value={productData.barcode} dataTestId="text-barcode" mono />
+                    <DataBox label={isEnglish ? "SKU" : "رمز المنتج (SKU)"} value={productData.sku} dataTestId="text-sku" mono primary />
                   </div>
 
                   {/* Descriptions */}
@@ -480,7 +480,7 @@ export default function Home() {
                       onClick={() => downloadMutation.mutate()}
                     >
                       <Download className="h-6 w-6" />
-                      SALLA EXPORT
+                      {isEnglish ? "SALLA EXPORT" : "تصدير إلى سلة"}
                     </Button>
                     <Button
                       size="lg"
@@ -489,7 +489,7 @@ export default function Home() {
                       onClick={() => downloadZidMutation.mutate()}
                     >
                       <Download className="h-6 w-6" />
-                      ZID EXPORT
+                      {isEnglish ? "ZID EXPORT" : "تصدير إلى زد"}
                     </Button>
                   </div>
                 </div>

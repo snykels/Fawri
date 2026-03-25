@@ -1,4 +1,5 @@
 import { useCallback, useState, useEffect } from "react";
+import { useLanguage } from "@/lib/language-provider";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Upload, X, Image as ImageIcon } from "lucide-react";
@@ -22,6 +23,7 @@ export function ImageUploadCard({
   onImageChange,
   testId,
 }: ImageUploadCardProps) {
+  const { isEnglish } = useLanguage();
   const [isDragging, setIsDragging] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
@@ -91,13 +93,15 @@ export function ImageUploadCard({
     <Card className="relative overflow-visible">
       <div className="p-6">
         <div className="mb-4 flex flex-col gap-1">
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <h3 className="text-lg font-semibold">{label}</h3>
-            <h3 className="text-lg font-semibold font-arabic" dir="rtl">{labelAr}</h3>
+          <div className="flex items-center gap-2">
+            <h3 className={`text-lg font-semibold ${!isEnglish ? 'font-arabic' : ''}`} dir={isEnglish ? "ltr" : "rtl"}>
+              {isEnglish ? label : labelAr}
+            </h3>
           </div>
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <p className="text-sm text-muted-foreground">{sublabel}</p>
-            <p className="text-sm text-muted-foreground font-arabic" dir="rtl">{sublabelAr}</p>
+          <div className="flex items-center gap-2">
+            <p className={`text-sm text-muted-foreground ${!isEnglish ? 'font-arabic' : ''}`} dir={isEnglish ? "ltr" : "rtl"}>
+              {isEnglish ? sublabel : sublabelAr}
+            </p>
           </div>
         </div>
 
@@ -118,13 +122,13 @@ export function ImageUploadCard({
                 <Upload className="h-8 w-8 text-muted-foreground" />
               </div>
               <p className="text-sm font-medium mb-1">
-                Drag and drop your image here
+                {isEnglish ? "Drag and drop your image here" : "اسحب وافلت الصورة هنا"}
               </p>
               <p className="text-xs text-muted-foreground mb-4">
-                or click to browse files
+                {isEnglish ? "or click to browse files" : "أو انقر لتصفح الملفات"}
               </p>
-              <p className="text-xs text-muted-foreground">
-                PNG, JPG, WEBP up to 10MB
+              <p className="text-xs text-muted-foreground" dir="ltr">
+                {isEnglish ? "PNG, JPG, WEBP up to 10MB" : "PNG, JPG, WEBP بحجم أقصى 10 ميجابايت"}
               </p>
             </div>
             <input

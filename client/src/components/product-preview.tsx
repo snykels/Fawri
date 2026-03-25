@@ -8,6 +8,7 @@ import {
 import { ChevronDown, Package, Tag, FileText, Barcode } from "lucide-react";
 import { useState } from "react";
 import type { ProductData } from "@shared/schema";
+import { useLanguage } from "@/lib/language-provider";
 
 interface ProductPreviewProps {
   data: ProductData;
@@ -15,14 +16,16 @@ interface ProductPreviewProps {
 
 export function ProductPreview({ data }: ProductPreviewProps) {
   const [isJsonOpen, setIsJsonOpen] = useState(false);
+  const { isEnglish } = useLanguage();
 
   return (
     <Card className="overflow-visible">
       <div className="p-6">
         <div className="flex items-center gap-2 mb-6">
           <Package className="h-5 w-5 text-primary" />
-          <h3 className="text-xl font-semibold">Generated Product Data</h3>
-          <span className="text-xl font-semibold font-arabic mr-auto" dir="rtl">بيانات المنتج</span>
+          <h3 className={`text-xl font-semibold ${isEnglish ? "" : "font-arabic"}`}>
+            {isEnglish ? "Generated Product Data" : "بيانات المنتج"}
+          </h3>
         </div>
 
         <div className="space-y-6">
@@ -30,7 +33,7 @@ export function ProductPreview({ data }: ProductPreviewProps) {
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Tag className="h-4 w-4" />
-                Product Name
+                {isEnglish ? "Product Name" : "اسم المنتج"}
               </div>
               <p
                 className="text-lg font-medium"
@@ -44,7 +47,7 @@ export function ProductPreview({ data }: ProductPreviewProps) {
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Barcode className="h-4 w-4" />
-                SKU / Barcode
+                {isEnglish ? "SKU / Barcode" : "رمز المنتج / الباركود"}
               </div>
               <p
                 className="text-lg font-mono font-medium"
@@ -57,13 +60,13 @@ export function ProductPreview({ data }: ProductPreviewProps) {
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Brand</p>
+              <p className="text-sm text-muted-foreground">{isEnglish ? "Brand" : "العلامة التجارية"}</p>
               <Badge variant="secondary" className="text-sm">
                 {data.brand}
               </Badge>
             </div>
             <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Category</p>
+              <p className="text-sm text-muted-foreground">{isEnglish ? "Category" : "الفئة"}</p>
               <Badge variant="outline" className="text-sm">
                 {data.category}
               </Badge>
@@ -71,7 +74,7 @@ export function ProductPreview({ data }: ProductPreviewProps) {
           </div>
 
           <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">SEO Title</p>
+            <p className="text-sm text-muted-foreground">{isEnglish ? "SEO Title" : "عنوان السيو (SEO)"}</p>
             <p className="text-sm" dir="auto">
               {data.seo_title}
             </p>
@@ -80,7 +83,7 @@ export function ProductPreview({ data }: ProductPreviewProps) {
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <FileText className="h-4 w-4" />
-              Marketing Description
+              {isEnglish ? "Marketing Description" : "الوصف التسويقي"}
             </div>
             <p className="text-sm leading-relaxed" dir="auto">
               {data.marketing_description}
@@ -94,10 +97,10 @@ export function ProductPreview({ data }: ProductPreviewProps) {
                   isJsonOpen ? "rotate-180" : ""
                 }`}
               />
-              View Raw JSON
+              {isEnglish ? "View Raw JSON" : "عرض البيانات الخام (JSON)"}
             </CollapsibleTrigger>
             <CollapsibleContent className="mt-3">
-              <pre className="p-4 rounded-lg bg-muted text-xs overflow-x-auto">
+              <pre className="p-4 rounded-lg bg-muted text-xs overflow-x-auto" dir="ltr">
                 <code>{JSON.stringify(data, null, 2)}</code>
               </pre>
             </CollapsibleContent>
