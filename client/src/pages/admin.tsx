@@ -37,124 +37,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
+import { useLocation } from "wouter";
+
 export default function AdminPage() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const { toast } = useToast();
-  const { isEnglish, toggleLanguage } = useLanguage();
-  const { theme } = useTheme();
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const res = await fetch("/api/admin/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password })
-      });
-      const data = await res.json();
-      if (data.success) {
-        setIsLoggedIn(true);
-        toast({ 
-          title: isEnglish ? "Logged in successfully" : "تم الدخول بنجاح", 
-          description: isEnglish ? "Welcome back, Admin." : "مرحباً بك مجدداً، أيها المشرف." 
-        });
-      } else {
-        toast({ 
-          title: isEnglish ? "Login failed" : "فشل الدخول", 
-          description: data.message, 
-          variant: "destructive" 
-        });
-      }
-    } catch {
-      toast({ 
-        title: "Error", 
-        description: isEnglish ? "Login request failed" : "فشل طلب تسجيل الدخول", 
-        variant: "destructive" 
-      });
-    }
-  };
-
+  const [, setLocation] = useLocation();
+  
   const handleLogout = async () => {
     await fetch("/api/admin/logout", { method: "POST" });
-    setIsLoggedIn(false);
+    setLocation("/admin/login");
   };
-
-  if (!isLoggedIn) {
-    return (
-      <div className="relative flex min-h-screen items-center justify-center p-4 bg-background overflow-hidden font-sans">
-        <div className="ambient-glow" />
-        
-        {/* Floating Language Toggle */}
-        <div className="absolute top-6 right-6 z-50">
-           <Button variant="ghost" size="sm" onClick={toggleLanguage} className="glass gap-2 font-bold px-4 h-10 rounded-xl border border-primary/10">
-              <Globe className="w-4 h-4 text-primary" />
-              {isEnglish ? "العربية" : "English"}
-           </Button>
-        </div>
-
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="w-full max-w-md z-10"
-        >
-          <Card className="glass border-primary/20 shadow-2xl overflow-hidden backdrop-blur-2xl bg-card/30">
-            <CardHeader className="space-y-1 pb-6 text-center border-b border-primary/10">
-              <div className="mx-auto w-32 mb-4 group cursor-pointer transition-transform hover:scale-105">
-                <img 
-                  src={theme === "dark" ? "/logo-dark.png" : "/logo_light.png"} 
-                  alt="Fawri Logo" 
-                  className="w-full h-auto object-contain drop-shadow-2xl" 
-                />
-              </div>
-              <CardTitle className="text-2xl font-black tracking-tight uppercase italic text-primary">
-                {isEnglish ? "Admin Console" : "لوحة المشرف"}
-              </CardTitle>
-              <p className="text-muted-foreground text-[10px] uppercase tracking-widest font-bold opacity-70">
-                {isEnglish ? "Secure Access Only" : "دخول آمن فقط"}
-              </p>
-            </CardHeader>
-            <CardContent className="pt-8 space-y-4">
-              <form onSubmit={handleLogin} className="space-y-4">
-                <div className="space-y-2">
-                  <div className="relative group">
-                    <Input 
-                      type="text" 
-                      placeholder={isEnglish ? "Username" : "اسم المستخدم"} 
-                      className="bg-background/40 border-primary/10 focus-visible:ring-primary pl-10 pr-10 h-12 transition-all hover:bg-background/60 rounded-xl font-medium"
-                      value={username} onChange={e => setUsername(e.target.value)} 
-                    />
-                    <Search className={`absolute ${isEnglish ? 'left-3' : 'right-3'} top-3.5 w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors`} />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <div className="relative group">
-                    <Input 
-                      type="password" 
-                      placeholder={isEnglish ? "Password" : "كلمة المرور"} 
-                      className="bg-background/40 border-primary/10 focus-visible:ring-primary pl-10 pr-10 h-12 transition-all hover:bg-background/60 rounded-xl font-medium"
-                      value={password} onChange={e => setPassword(e.target.value)} 
-                    />
-                    <ShieldCheck className={`absolute ${isEnglish ? 'left-3' : 'right-3'} top-3.5 w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors`} />
-                  </div>
-                </div>
-                <Button type="submit" size="lg" className="w-full bolt-button font-bold text-lg h-12 shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all rounded-xl">
-                  {isEnglish ? "Authorize Entry" : "دخول اللوحة"}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-        </motion.div>
-      </div>
-    );
-  }
-
-  return <AdminDashboard onLogout={handleLogout} />;
-}
-
-function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [token, setToken] = useState("");
   const { toast } = useToast();
   const { isEnglish, toggleLanguage } = useLanguage();
@@ -191,6 +82,10 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     queryKey: ["/api/admin/products"],
     queryFn: async () => {
       const res = await fetch("/api/admin/products");
+      if (res.status === 401) {
+        setLocation("/admin/login");
+        return { data: [] };
+      }
       if (!res.ok) throw new Error("Failed to fetch products");
       return res.json();
     }
@@ -229,7 +124,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       {/* Sidebar Layout */}
       <div className="flex h-screen overflow-hidden relative z-10">
         {/* Sidebar */}
-        <aside className="w-72 bg-card/20 backdrop-blur-2xl border-r border-primary/10 flex flex-col p-6 hidden lg:flex">
+        <aside className="w-72 bg-white/60 dark:bg-card/30 backdrop-blur-xl border-r border-border flex flex-col p-6 hidden lg:flex">
           <div className="flex items-center gap-3 mb-12 px-2">
              <img 
                 src={theme === "dark" ? "/logo-dark.png" : "/logo_light.png"} 
@@ -240,7 +135,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
           </div>
           
           <nav className="flex-1 space-y-2">
-            <Button variant="ghost" className="w-full justify-start gap-3 bg-primary/10 text-primary hover:bg-primary/20 font-bold h-12 transition-all border border-primary/5 rounded-xl">
+            <Button variant="ghost" className="w-full justify-start gap-3 bg-white/80 dark:bg-background/50 text-foreground hover:bg-accent hover:text-accent-foreground font-bold h-12 transition-all border border-border shadow-sm rounded-xl">
               <Package className="w-5 h-5" />
               {isEnglish ? "Products List" : "قائمة المنتجات"}
             </Button>
@@ -251,11 +146,11 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
           </nav>
 
           <div className="space-y-2 mt-auto">
-             <Button variant="outline" size="sm" onClick={toggleLanguage} className="w-full justify-start gap-3 glass font-bold h-12 rounded-xl border border-primary/10 mb-2">
+             <Button variant="outline" size="sm" onClick={toggleLanguage} className="w-full justify-start gap-3 bg-white/50 dark:bg-card/20 hover:bg-white dark:hover:bg-card font-bold h-12 rounded-xl border border-border shadow-sm mb-2 transition-all">
                 <Globe className="w-5 h-5 text-primary" />
                 {isEnglish ? "العربية" : "English Mode"}
              </Button>
-             <Button variant="outline" onClick={onLogout} className="w-full justify-start gap-3 border-primary/10 bg-background/20 backdrop-blur-sm hover:bg-destructive/10 hover:text-destructive hover:border-destructive/20 transition-all h-12 rounded-xl group font-bold">
+             <Button variant="outline" onClick={handleLogout} className="w-full justify-start gap-3 border-border bg-white/50 dark:bg-background/20 backdrop-blur-sm hover:bg-destructive hover:text-destructive-foreground hover:border-destructive transition-all h-12 rounded-xl group font-bold">
                 <LogOut className={`w-5 h-5 group-hover:${isEnglish ? 'translate-x-1' : '-translate-x-1'} transition-transform`} />
                 {isEnglish ? "Secure Logout" : "تسجيل الخروج الآمن"}
              </Button>
@@ -278,7 +173,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                 </p>
               </motion.div>
               
-              <div className="flex bg-card/30 border border-primary/10 backdrop-blur-xl p-1.5 rounded-2xl shadow-2xl">
+              <div className="flex bg-white/70 dark:bg-card/40 border border-border backdrop-blur-md p-1.5 rounded-2xl shadow-sm">
                 <Input
                   type="password"
                   placeholder={isEnglish ? "Salla Access Token" : "رمز الوصول لمتجر سلة"}
@@ -306,10 +201,10 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             </div>
 
             {/* Table Section */}
-            <Card className="glass border-primary/10 shadow-2xl overflow-hidden backdrop-blur-2xl bg-card/20 rounded-[2rem]">
-              <CardHeader className="border-b border-primary/5 bg-primary/5 px-8 py-6">
-                <CardTitle className="text-xl flex items-center gap-2 font-black uppercase tracking-widest opacity-90">
-                  <Package className="w-5 h-5 text-primary" />
+            <Card className="bg-white/70 dark:bg-card/40 border border-border shadow-xl hover:shadow-2xl transition-all overflow-hidden backdrop-blur-md rounded-[2rem]">
+              <CardHeader className="border-b border-border/50 bg-background/30 px-8 py-6">
+                <CardTitle className="text-xl flex items-center gap-2 font-black uppercase text-foreground">
+                  <Package className="w-5 h-5 text-muted-foreground" />
                   {isEnglish ? "Sync History Log" : "سجل عمليات المزامنة"}
                 </CardTitle>
               </CardHeader>
@@ -424,13 +319,13 @@ function StatsCard({ title, value, icon: Icon, color, delay }: { title: string; 
       animate={{ opacity: 1, scale: 1 }}
       transition={{ delay }}
     >
-      <Card className="glass border-primary/10 hover:border-primary/40 transition-all hover:translate-y-[-6px] shadow-2xl group bg-card/10 overflow-hidden rounded-[2rem]">
+      <Card className="bg-white/70 dark:bg-card/40 border border-border hover:border-primary/40 transition-all hover:translate-y-[-6px] shadow-lg hover:shadow-xl group overflow-hidden rounded-[2rem]">
         <div className={`absolute top-0 ${isEnglish ? 'left-0' : 'right-0'} w-1 h-full bg-primary opacity-0 group-hover:opacity-100 transition-all`} />
         <CardContent className="p-8">
           <div className="flex items-center justify-between">
             <div className="space-y-1">
-              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] opacity-60 group-hover:opacity-100 transition-opacity">{title}</p>
-              <p className="text-5xl font-black tabular-nums tracking-tighter">{value}</p>
+              <p className="text-xs font-bold text-muted-foreground uppercase">{title}</p>
+              <p className="text-4xl font-black tabular-nums">{value}</p>
             </div>
             <div className={`p-5 rounded-3xl bg-background/40 border border-primary/5 shadow-inner group-hover:scale-110 group-hover:rotate-6 transition-all ${color}`}>
               <Icon className="w-10 h-10" />
@@ -443,12 +338,12 @@ function StatsCard({ title, value, icon: Icon, color, delay }: { title: string; 
 }
 
 function Thumbnail({ url, label }: { url?: string; label: string }) {
-  if (!url) return <div className="w-12 h-16 bg-muted/30 rounded-xl border border-dashed border-primary/20 flex items-center justify-center text-[8px] font-black text-muted-foreground/40 uppercase tracking-tighter">NULL</div>;
+  if (!url) return <div className="w-12 h-16 bg-muted/40 rounded-lg border border-dashed border-border flex items-center justify-center text-[10px] font-semibold text-muted-foreground uppercase">NULL</div>;
   
   return (
     <motion.div 
-      whileHover={{ scale: 1.25, zIndex: 50, rotate: -2 }}
-      className="relative w-12 h-16 rounded-xl border-2 border-primary/10 overflow-hidden bg-background shadow-2xl cursor-pointer group"
+      whileHover={{ scale: 1.15, zIndex: 50 }}
+      className="relative w-12 h-16 rounded-lg border border-border overflow-hidden bg-background shadow-md cursor-pointer group"
     >
       <img src={url} alt={label} className="w-full h-full object-cover transition-transform group-hover:scale-125 duration-700" />
       <div className="absolute inset-0 bg-primary/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">

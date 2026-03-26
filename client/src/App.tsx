@@ -8,12 +8,16 @@ import { LanguageProvider } from "@/lib/language-provider";
 import Home from "@/pages/home";
 import AdminPage from "@/pages/admin";
 import PublishPage from "@/pages/publish";
+import LoginPage from "@/pages/login";
+import AdminLoginPage from "@/pages/admin-login";
 import NotFound from "@/pages/not-found";
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
+      <Route path="/login" component={LoginPage} />
+      <Route path="/admin/login" component={AdminLoginPage} />
       <Route path="/admin" component={AdminPage} />
       <Route path="/publish" component={PublishPage} />
       <Route component={NotFound} />
