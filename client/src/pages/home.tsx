@@ -268,24 +268,22 @@ export default function Home() {
       <div className="ambient-glow" />
       <Header />
 
-      <main className="max-w-6xl mx-auto px-6 py-12 relative z-10">
+      <main className="w-full max-w-[1600px] mx-auto px-6 py-8 relative z-10">
         <div className="space-y-8">
-          <div className="text-center space-y-4 mb-20 mt-8">
-            <h2 className="text-4xl md:text-6xl font-black tracking-tighter leading-tight italic uppercase">
-              {isEnglish ? "Intelligent" : "تحليل"}{" "}
-              <span className="text-primary">{isEnglish ? "Product" : "المنتج"}</span>{" "}
-              {isEnglish ? "Sense" : "بذكاء"}
+          <div className={`space-y-2 mb-10 border-b border-border/50 pb-6 ${isEnglish ? 'text-left' : 'text-right'}`}>
+            <h2 className="text-3xl font-black text-foreground">
+              {isEnglish ? "Dashboard" : "لوحة التحكم"}
             </h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto font-bold opacity-80 decoration-primary/20 underline-offset-4 decoration-2">
+            <p className="text-muted-foreground text-lg opacity-80">
               {isEnglish 
-                ? "Upload product shots to extract high-accuracy data for Salla & Zid using advanced AI sense." 
-                : "ارفع صور المنتج وسيقوم الذكاء الاصطناعي بتحليلها واستخراج البيانات تلقائياً لمنصتي سلة وزد بدقة متناهية"}
+                ? "Upload product images and let our AI engine seamlessly extract catalog attributes for Salla and Zid." 
+                : "ارفع صور المنتج ودع الذكاء الاصطناعي يستخرج بيانات الكتالوج لمنصتي سلة وزد بسلاسة."}
             </p>
           </div>
 
           {!productData && !generateMutation.isPending && (
             <>
-              <div className="grid gap-6 lg:grid-cols-2">
+              <div className="grid gap-6 lg:grid-cols-2 bg-white/50 dark:bg-card/30 p-8 rounded-[2rem] border border-border shadow-sm">
                 <ImageUploadCard
                   label="Front Image"
                   labelAr="الصورة الأمامية"
@@ -310,7 +308,7 @@ export default function Home() {
                 <div className={`flex flex-col items-center gap-4 transition-all duration-500 ${canGenerate ? 'scale-110' : 'opacity-40 scale-100'}`}>
                    <Button
                     size="lg"
-                    className={`bolt-button px-16 py-10 text-2xl gap-4 rounded-[2.5rem] font-black shadow-2xl transition-all duration-500 border-2 ${canGenerate ? (generateMutation.isError ? 'bg-destructive/20 border-destructive/50 text-destructive' : 'bg-primary text-white shadow-primary/40 border-primary/20 scale-105') : 'bg-muted text-muted-foreground shadow-none border-transparent grayscale'}`}
+                    className={`px-16 py-8 text-2xl gap-4 rounded-[2rem] font-bold shadow-lg transition-all duration-300 border ${canGenerate ? (generateMutation.isError ? 'bg-destructive/10 border-destructive/30 text-destructive' : 'bg-primary text-primary-foreground shadow-primary/30 border-primary scale-105 hover:scale-110') : 'bg-muted text-muted-foreground shadow-none border-transparent'}`}
                     disabled={!generateMutation.isError && !!canGenerate} // Only clickable if error or manual
                     onClick={() => generateMutation.isError && generateMutation.mutate()}
                   >
@@ -340,19 +338,17 @@ export default function Home() {
                 </div>
               </div>
 
-              <Card className="p-16 glass rounded-[3rem] shadow-2xl border-primary/5">
-                <div className="flex flex-col items-center justify-center text-center space-y-6">
-                  <div className="p-6 rounded-3xl bg-primary/10 border border-primary/20 shadow-inner group transition-transform hover:scale-110">
-                    <Upload className="h-12 w-12 text-primary" />
-                  </div>
-                  <div className="space-y-3">
-                    <h3 className="text-3xl font-black italic uppercase tracking-tight">
-                      {isEnglish ? "Awaiting Input" : "بانتظار صور المنتج..."}
-                    </h3>
-                    <p className="text-muted-foreground max-w-md font-bold mx-auto opacity-70">
-                      {isEnglish ? "Connect your product shots to begin the data extraction magic." : "ارفع صورة المنتج الأمامية والخلفية لنبدأ السحر"}
-                    </p>
-                  </div>
+              <Card className="p-12 bg-white/50 dark:bg-card/20 rounded-[2rem] border-dashed border-2 border-border flex flex-col items-center justify-center text-center space-y-4">
+                <div className="p-5 rounded-2xl bg-accent/10 border border-accent/20 text-accent transition-transform hover:scale-110">
+                  <Upload className="h-10 w-10 text-accent" />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-2xl font-bold">
+                    {isEnglish ? "Awaiting Input" : "بانتظار صور المنتج..."}
+                  </h3>
+                  <p className="text-muted-foreground max-w-sm mx-auto">
+                    {isEnglish ? "Upload your product shots above to begin data extraction." : "قم برفع صورة المنتج الأمامية والخلفية لنبدأ السحر"}
+                  </p>
                 </div>
               </Card>
             </>
@@ -396,50 +392,48 @@ export default function Home() {
               <div className="grid gap-8 lg:grid-cols-3">
                 {/* Product Image Column */}
                 <div className="lg:col-span-1">
-                  <Card className="overflow-hidden glass shadow-2xl rounded-[3rem] border-primary/5 sticky top-28">
-                    <div className="p-8">
-                      <div className="flex flex-col items-center gap-6">
-                        {((productData.images && productData.images.length > 0) || productData.product_image_url) ? (
-                          <Carousel className="w-full" opts={{ loop: true }}>
-                            <CarouselContent>
-                              {(productData.images && productData.images.length > 0
-                                ? productData.images
-                                : [productData.product_image_url]).filter(Boolean).map((imgUrl, index) => (
-                                  <CarouselItem key={index}>
-                                    <div className="group relative aspect-square rounded-[2rem] bg-white border border-primary/10 shadow-inner overflow-hidden">
-                                      <img
-                                        src={imgUrl}
-                                        alt="Product"
-                                        className="w-full h-full object-contain p-6 group-hover:scale-110 transition-transform duration-700"
-                                      />
-                                      {/* Hover Action */}
-                                      <div className="absolute inset-0 bg-primary/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                                        <Button size="icon" variant="secondary" className="rounded-xl shadow-xl hover:scale-110 transition-all" onClick={() => window.open(imgUrl, "_blank")}>
-                                          <ExternalLink className="h-5 w-5" />
-                                        </Button>
-                                        <Button size="icon" variant="secondary" className="rounded-xl shadow-xl hover:scale-110 transition-all" onClick={() => {
-                                          navigator.clipboard.writeText(imgUrl || "");
-                                          toast({ title: isEnglish ? "Link Copied" : "تم نسخ الرابط" });
-                                        }}>
-                                          <Copy className="h-5 w-5" />
-                                        </Button>
-                                      </div>
+                  <Card className="overflow-hidden bg-white/80 dark:bg-card/50 shadow-lg rounded-[2rem] border-border sticky top-28 p-6">
+                    <div className="flex flex-col items-center gap-6">
+                      {((productData.images && productData.images.length > 0) || productData.product_image_url) ? (
+                        <Carousel className="w-full" opts={{ loop: true }}>
+                          <CarouselContent>
+                            {(productData.images && productData.images.length > 0
+                              ? productData.images
+                              : [productData.product_image_url]).filter(Boolean).map((imgUrl, index) => (
+                                <CarouselItem key={index}>
+                                  <div className="group relative aspect-square rounded-2xl bg-background border border-border overflow-hidden">
+                                    <img
+                                      src={imgUrl}
+                                      alt="Product"
+                                      className="w-full h-full object-contain p-4 group-hover:scale-105 transition-transform"
+                                    />
+                                    {/* Hover Action */}
+                                    <div className="absolute inset-0 bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                      <Button size="icon" variant="secondary" className="rounded-lg shadow hover:scale-105" onClick={() => window.open(imgUrl, "_blank")}>
+                                        <ExternalLink className="h-5 w-5" />
+                                      </Button>
+                                      <Button size="icon" variant="secondary" className="rounded-lg shadow hover:scale-105" onClick={() => {
+                                        navigator.clipboard.writeText(imgUrl || "");
+                                        toast({ title: isEnglish ? "Link Copied" : "تم نسخ الرابط" });
+                                      }}>
+                                        <Copy className="h-5 w-5" />
+                                      </Button>
                                     </div>
-                                  </CarouselItem>
-                                ))}
-                            </CarouselContent>
-                            <div className="flex justify-center gap-2 mt-4">
-                                <CarouselPrevious className="static translate-y-0 rounded-xl" />
-                                <CarouselNext className="static translate-y-0 rounded-xl" />
-                            </div>
-                          </Carousel>
-                        ) : (
-                          <div className="w-full aspect-square rounded-[2rem] bg-card/20 border-2 border-dashed border-primary/20 flex flex-col items-center justify-center p-8">
-                            <Package className="h-16 w-16 text-primary/30 mb-4" />
-                            <p className="text-center font-bold text-sm opacity-50 uppercase tracking-widest">{isEnglish ? "NO IMAGE" : "بدون صورة"}</p>
+                                  </div>
+                                </CarouselItem>
+                              ))}
+                          </CarouselContent>
+                          <div className="flex justify-center gap-2 mt-4">
+                              <CarouselPrevious className="static translate-y-0 rounded-lg" />
+                              <CarouselNext className="static translate-y-0 rounded-lg" />
                           </div>
-                        )}
-                      </div>
+                        </Carousel>
+                      ) : (
+                        <div className="w-full aspect-square rounded-2xl bg-muted border border-dashed border-border flex flex-col items-center justify-center p-8">
+                          <Package className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                          <p className="text-center font-medium text-sm text-muted-foreground uppercase">{isEnglish ? "NO IMAGE" : "بدون صورة"}</p>
+                        </div>
+                      )}
                     </div>
                   </Card>
                 </div>
@@ -467,15 +461,15 @@ export default function Home() {
                     <Button
                       size="lg"
                       variant="outline"
-                      className="flex-1 py-7 text-lg gap-2 rounded-2xl border-primary/10 glass hover:bg-primary/5 font-bold transition-all"
+                      className="flex-1 py-7 text-lg gap-2 rounded-xl border-border bg-white/50 hover:bg-accent hover:text-accent-foreground font-semibold transition-all"
                       onClick={handleReset}
                     >
                       <RefreshCw className="h-5 w-5" />
-                      {isEnglish ? "NEW PRODUCT" : "منتج جديد"}
+                      {isEnglish ? "NEW UPLOAD" : "رفع جديد"}
                     </Button>
                     <Button
                       size="lg"
-                      className="flex-1 py-7 text-lg gap-3 rounded-2xl bg-[#00b289] hover:bg-[#008f6e] text-white shadow-xl shadow-[#00b289]/10 font-black transition-all"
+                      className="flex-1 py-7 text-lg gap-3 rounded-xl bg-[#00b289] hover:bg-[#008f6e] text-white shadow-md font-semibold transition-all"
                       disabled={downloadMutation.isPending}
                       onClick={() => downloadMutation.mutate()}
                     >
@@ -484,7 +478,7 @@ export default function Home() {
                     </Button>
                     <Button
                       size="lg"
-                      className="flex-1 py-7 text-lg gap-3 rounded-2xl bg-[#7e3af2] hover:bg-[#6c2bd9] text-white shadow-xl shadow-[#7e3af2]/10 font-black transition-all"
+                      className="flex-1 py-7 text-lg gap-3 rounded-xl bg-[#7e3af2] hover:bg-[#6c2bd9] text-white shadow-md font-semibold transition-all"
                       disabled={downloadZidMutation.isPending}
                       onClick={() => downloadZidMutation.mutate()}
                     >
@@ -520,20 +514,20 @@ function DataBox({ label, value, big, mono, primary, dataTestId }: { label: stri
   
   return (
     <div 
-      className={`p-6 rounded-3xl glass border-primary/10 hover:bg-primary/5 transition-all cursor-pointer group ${big ? 'md:col-span-2' : ''}`}
+      className={`p-5 rounded-2xl bg-white/70 dark:bg-card/40 border border-border hover:border-primary/40 hover:shadow-md transition-all cursor-pointer group ${big ? 'md:col-span-2' : ''}`}
       onClick={() => {
         navigator.clipboard.writeText(value);
         toast({ title: isEnglish ? "Field Copied" : "تم نسخ الحقل" });
       }}
     >
       <div className="flex justify-between items-start">
-        <div className="space-y-1">
-          <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest opacity-60 group-hover:opacity-100 transition-opacity">{label}</p>
-          <p className={`font-bold leading-tight ${big ? 'text-2xl' : 'text-lg'} ${mono ? 'font-mono tracking-tighter' : ''} ${primary ? 'text-primary' : 'text-foreground'}`} data-testid={dataTestId}>
+        <div className="space-y-1.5">
+          <p className="text-xs font-semibold text-muted-foreground uppercase">{label}</p>
+          <p className={`font-semibold leading-tight ${big ? 'text-xl' : 'text-lg'} ${mono ? 'font-mono' : ''} ${primary ? 'text-primary font-bold' : 'text-foreground'}`} data-testid={dataTestId}>
             {value || "---"}
           </p>
         </div>
-        <Copy className="h-4 w-4 text-primary opacity-0 group-hover:opacity-40 transition-opacity" />
+        <Copy className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
       </div>
     </div>
   );
@@ -546,26 +540,26 @@ function DescBox({ icon: Icon, label, value, expandable }: { icon: any; label: s
   if (!value) return null;
 
   return (
-    <Card className={`glass border-primary/5 hover:border-primary/20 transition-all rounded-3xl overflow-hidden group`}>
+    <Card className={`bg-white/70 dark:bg-card/40 border-border hover:border-primary/40 hover:shadow-md transition-all rounded-2xl overflow-hidden group`}>
       <div 
-        className="p-6 cursor-pointer hover:bg-primary/5 transition-colors"
+        className="p-5 cursor-pointer"
         onClick={() => {
           navigator.clipboard.writeText(value);
-          toast({ title: isEnglish ? "Message Copied" : "تم نسخ النص" });
+          toast({ title: isEnglish ? "Text Copied" : "تم نسخ النص" });
         }}
       >
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-3 border-b border-border/50 pb-3">
           <div className="flex items-center gap-2">
-            <div className="p-2 rounded-xl bg-primary/10 text-primary">
+            <div className="p-1.5 rounded-lg bg-accent/10 text-accent">
               <Icon className="h-4 w-4" />
             </div>
-            <h4 className="text-xs font-black uppercase tracking-widest opacity-60">
+            <h4 className="text-sm font-semibold text-muted-foreground uppercase">
               {label}
             </h4>
           </div>
-          <Copy className="h-4 w-4 text-primary opacity-0 group-hover:opacity-40 transition-opacity" />
+          <Copy className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
         </div>
-        <div className={`text-sm font-bold leading-relaxed whitespace-pre-wrap ${expandable ? 'max-h-[250px] overflow-y-auto pr-2' : ''}`}>
+        <div className={`text-sm font-medium text-foreground leading-relaxed whitespace-pre-wrap ${expandable ? 'max-h-[250px] overflow-y-auto pr-2' : ''}`}>
           {value}
         </div>
       </div>

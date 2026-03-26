@@ -90,16 +90,16 @@ export function ImageUploadCard({
   };
 
   return (
-    <Card className="relative overflow-visible">
+    <Card className="relative overflow-visible bg-transparent border-none shadow-none">
       <div className="p-6">
         <div className="mb-4 flex flex-col gap-1">
           <div className="flex items-center gap-2">
-            <h3 className={`text-lg font-semibold ${!isEnglish ? 'font-arabic' : ''}`} dir={isEnglish ? "ltr" : "rtl"}>
+            <h3 className={`text-xl font-bold text-foreground ${!isEnglish ? 'font-arabic' : ''}`} dir={isEnglish ? "ltr" : "rtl"}>
               {isEnglish ? label : labelAr}
             </h3>
           </div>
           <div className="flex items-center gap-2">
-            <p className={`text-sm text-muted-foreground ${!isEnglish ? 'font-arabic' : ''}`} dir={isEnglish ? "ltr" : "rtl"}>
+            <p className={`text-sm text-muted-foreground font-medium ${!isEnglish ? 'font-arabic' : ''}`} dir={isEnglish ? "ltr" : "rtl"}>
               {isEnglish ? sublabel : sublabelAr}
             </p>
           </div>
@@ -108,10 +108,10 @@ export function ImageUploadCard({
         {!image ? (
           <label
             htmlFor={testId}
-            className={`flex flex-col items-center justify-center min-h-64 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${
+            className={`flex flex-col items-center justify-center min-h-64 border-2 border-dashed rounded-2xl cursor-pointer transition-all duration-300 ${
               isDragging
-                ? "border-primary bg-primary/5"
-                : "border-muted-foreground/25 hover:border-primary/50"
+                ? "border-primary bg-primary/10 scale-105"
+                : "border-border hover:border-primary/50 hover:bg-white/50 dark:hover:bg-card/50"
             }`}
             onDrop={handleDrop}
             onDragOver={handleDragOver}
@@ -121,7 +121,7 @@ export function ImageUploadCard({
               <div className="p-4 rounded-full bg-muted mb-4">
                 <Upload className="h-8 w-8 text-muted-foreground" />
               </div>
-              <p className="text-sm font-medium mb-1">
+              <p className="text-base font-bold mb-1 text-foreground">
                 {isEnglish ? "Drag and drop your image here" : "اسحب وافلت الصورة هنا"}
               </p>
               <p className="text-xs text-muted-foreground mb-4">
@@ -141,11 +141,11 @@ export function ImageUploadCard({
             />
           </label>
         ) : (
-          <div className="relative min-h-64 rounded-lg overflow-hidden bg-muted">
+          <div className="relative min-h-64 rounded-2xl overflow-hidden bg-background border border-border shadow-sm group">
             <img
               src={previewUrl || ""}
               alt="Preview"
-              className="w-full h-64 object-contain"
+              className="w-full h-64 object-contain p-2 group-hover:scale-105 transition-transform duration-500"
               data-testid={`${testId}-preview`}
             />
             <div className="absolute top-2 right-2 flex gap-1">
@@ -178,7 +178,7 @@ export function ImageUploadCard({
                 <X className="h-4 w-4" />
               </Button>
             </div>
-            <div className="absolute bottom-0 left-0 right-0 bg-background/90 backdrop-blur-sm p-3">
+            <div className="absolute bottom-0 left-0 right-0 bg-background/95 backdrop-blur border-t border-border p-3 translate-y-full group-hover:translate-y-0 transition-transform duration-300">
               <div className="flex items-center gap-2">
                 <ImageIcon className="h-4 w-4 text-muted-foreground" />
                 <div className="flex-1 min-w-0">
