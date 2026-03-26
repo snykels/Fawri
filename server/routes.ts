@@ -420,7 +420,7 @@ export async function registerRoutes(
   app.get("/api/salla/auth-url", requireAdmin, async (req, res) => {
     try {
       const { getAuthorizationUrl } = await import("./salla-oauth");
-      const redirectUri = req.query.redirect_uri as string || `${req.protocol}://${req.get('host')}/api/salla/callback`;
+      const redirectUri = req.query.redirect_uri as string || `https://upload.fawri.cloud/api/salla/callback`;
       const authUrl = getAuthorizationUrl(redirectUri);
       
       res.json({ 
@@ -1714,6 +1714,10 @@ export async function registerRoutes(
           await handleAppUninstall(data, merchant);
           break;
 
+        case 'app.store.authorize':
+          await handleAppStoreAuthorize(data, merchant);
+          break;
+
         case 'product.create':
           await handleProductCreate(data, merchant);
           break;
@@ -1836,43 +1840,64 @@ export async function registerRoutes(
     // 3. تحديث التقارير
   }
 
-  // ============================================
-  // API لجلب أحداث Webhook (للإدارة)
-  // ============================================
-  
-  app.get("/api/admin/webhook-events", requireAdmin, async (req, res) => {
+  /**
+   * معالج حدث تفويض التطبيق (app.store.authorize)
+   * هذا الحدث يأتي مع التوكنات عند تثبيت التطبيق
+   */
+  async function handleAppStoreAuthorize(data: any, merchant: any) {
+    console.log(`[App Store Authorize] Received authorization for merchant: ${merchant}`);
+    console.log(`[App Store Authorize] Data:`, JSON.stringify(data, null, 2));
+    
     try {
-      const events = await db.select()
-        .from(sallaWebhookEvents)
-        .orderBy(desc(sallaWebhookEvents.createdAt))
-        .limit(100);
+      // استخراج التوكنات من البيانات
+      const accessToken = data.access_token;
+      const refreshToken = data.refresh_token;
+      const expiresIn = data.expires; // expires هو timestamp بالثواني
+      const merchantId = merchant?.toString();
       
-      res.json({ 
-        success: true, 
-        data: events,
-        count: events.length
+      if (!accessToken || !refreshToken) {
+        console.error("[App Store Authorize] Missing tokens in data");
+        return;
+      }
+      
+      // حساب تاريخ انتهاء الصلاحية
+      const expiresAt = new Date(expiresIn * 1000); // تحويل من ثواني إلى milliseconds
+      
+      console.log(`[App Store Authorize] Saving tokens for merchant: ${merchantId}`);
+      console.log(`[App Store Authorize] Access token: ${accessToken.substring(0, 20)}...`);
+      console.log(`[App Store Authorize] Expires at: ${expiresAt.toISOString()}`);
+      
+      // حفظ التوكنات في قاعدة البيانات
+      await db.insert(sallaTokens).values({
+        merchantId: merchantId,
+        accessToken: accessToken,
+        refreshToken: refreshToken,
+        expiresAt: expiresAt,
       });
-    } catch (e: any) {
-      res.status(500).json({ success: false, error: e.message });
+      
+      console.log(`[App Store Authorize] ✅ Tokens saved successfully for merchant: ${merchantId}`);
+      
+    } catch (error: any) {
+      console.error("[App Store Authorize] Error saving tokens:", error);
     }
-  });
+  }
 
-  // ============================================
-  // API لاختبار Webhook (للمطورين)
-  // ============================================
-  
+  /**
+   * محاكاة إرسال Webhook للاختبار
+   */
   app.post("/api/salla/webhook/test", async (req, res) => {
     try {
+      const { eventType, data } = req.body;
+      
       const testEvent = {
-        event: req.body.event || 'product.create',
+        event: eventType || 'product.create',
         merchant: {
-          id: 12345,
-          name: 'متجر تجريبي'
+          id: 'test_merchant_123',
+          name: 'متجر اختباري'
         },
-        data: req.body.data || {
-          id: 999,
-          name: 'منتج تجريبي',
-          price: { amount: 100, currency: 'SAR' }
+        data: data || {
+          id: 'test_product_456',
+          name: 'منتج اختباري'
         },
         created_at: new Date().toISOString(),
         id: `test_${Date.now()}`
@@ -1881,7 +1906,7 @@ export async function registerRoutes(
       console.log(`[Webhook Test] Sending test event:`, testEvent);
 
       // محاكاة إرسال Webhook
-      const response = await fetch(`${req.protocol}://${req.get('host')}/api/salla/webhook`, {
+      const response = await fetch(`https://upload.fawri.cloud/api/salla/webhook`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

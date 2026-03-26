@@ -73,6 +73,11 @@ npm run dev
 http://localhost:5000
 ```
 
+### 5. URL الإنتاج
+```
+https://upload.fawri.cloud
+```
+
 ## 📖 طريقة الاستخدام
 
 ### 1. رفع صور المنتج

@@ -6,7 +6,7 @@
  * 2. نفذ السكريبت: npx tsx test-salla-integration.ts
  */
 
-const BASE_URL = process.env.TEST_BASE_URL || 'http://localhost:5001';
+const BASE_URL = process.env.TEST_BASE_URL || 'https://upload.fawri.cloud';
 
 interface TestResult {
   name: string;
