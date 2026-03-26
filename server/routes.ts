@@ -8,7 +8,7 @@ import fs from "fs";
 import { productDataSchema, type ProductData } from "@shared/schema";
 import { image_search } from "duckduckgo-images-api";
 import { db } from "./db";
-import { uploadedProducts, sallaTokens } from "@shared/schema";
+import { uploadedProducts, sallaTokens, sallaWebhookEvents } from "@shared/schema";
 import { eq, desc } from "drizzle-orm";
 import session from "express-session";
 import createMemoryStore from "memorystore";
@@ -1657,6 +1657,252 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error("Zid Excel generation error:", error);
       return res.status(500).json({ error: "Failed to generate Zid Excel file" });
+    }
+  });
+
+  // ============================================
+  // Webhook Handlers لأحداث سلة
+  // ============================================
+
+  /**
+   * معالج Webhook الرئيسي - يستقبل جميع الأحداث من سلة
+   * يجب تسجيل هذا الرابط في لوحة تحكم سلة كـ Webhook URL
+   * الرابط: https://yourdomain.com/api/salla/webhook
+   */
+  app.post("/api/salla/webhook", async (req, res) => {
+    try {
+      // التحقق من صحة الطلب (اختياري ولكن مُنصح به)
+      const webhookSecret = process.env.SALLA_WEBHOOK_SECRET;
+      if (webhookSecret) {
+        const signature = req.headers['x-salla-signature'];
+        // TODO: التحقق من التوقيع باستخدام HMAC
+      }
+
+      const { event, merchant, data, created_at } = req.body;
+
+      if (!event) {
+        return res.status(400).json({ error: "Event type is required" });
+      }
+
+      console.log(`[Salla Webhook] Received event: ${event}`, {
+        merchant: merchant?.id,
+        createdAt: created_at
+      });
+
+      // حفظ الحدث في قاعدة البيانات
+      try {
+        await db.insert(sallaWebhookEvents).values({
+          merchantId: merchant?.id?.toString(),
+          eventType: event,
+          eventId: req.body.id?.toString(),
+          payload: req.body,
+          processed: false,
+        });
+        console.log(`[Salla Webhook] Event saved to database`);
+      } catch (dbError) {
+        console.error("[Salla Webhook] Failed to save event:", dbError);
+        // لا نفشل الطلب إذا فشل حفظ قاعدة البيانات
+      }
+
+      // معالجة الحدث بناءً على النوع
+      switch (event) {
+        case 'app.install':
+          await handleAppInstall(data, merchant);
+          break;
+
+        case 'app.uninstall':
+          await handleAppUninstall(data, merchant);
+          break;
+
+        case 'product.create':
+          await handleProductCreate(data, merchant);
+          break;
+
+        case 'product.update':
+          await handleProductUpdate(data, merchant);
+          break;
+
+        case 'order.create':
+          await handleOrderCreate(data, merchant);
+          break;
+
+        case 'order.update':
+          await handleOrderUpdate(data, merchant);
+          break;
+
+        default:
+          console.log(`[Salla Webhook] Unhandled event type: ${event}`);
+      }
+
+      // تحديث حالة الحدث كمعالج
+      try {
+        await db.update(sallaWebhookEvents)
+          .set({ 
+            processed: true, 
+            processedAt: new Date() 
+          })
+          .where(eq(sallaWebhookEvents.eventId, req.body.id?.toString()));
+      } catch (updateError) {
+        console.error("[Salla Webhook] Failed to update event status:", updateError);
+      }
+
+      // الرد بنجاح (مطلوب من سلة خلال 5 ثوانٍ)
+      res.status(200).json({ success: true, message: "Webhook received" });
+
+    } catch (error: any) {
+      console.error("[Salla Webhook] Error processing webhook:", error);
+      // نرد بـ 200 حتى لا يتم إرسال الحدث مرة أخرى
+      res.status(200).json({ success: false, error: error.message });
+    }
+  });
+
+  /**
+   * معالج حدث تثبيت التطبيق
+   */
+  async function handleAppInstall(data: any, merchant: any) {
+    console.log(`[App Install] App installed by merchant: ${merchant?.id}`);
+    console.log(`[App Install] Store name: ${merchant?.name || 'Unknown'}`);
+    
+    // يمكن هنا:
+    // 1. إرسال بريد ترحيبي
+    // 2. إنشاء إعدادات افتراضية للمتجر
+    // 3. تسجيل المتجر في قاعدة البيانات
+    // 4. إرسال إشعار للفريق
+  }
+
+  /**
+   * معالج حدث إزالة التطبيق
+   */
+  async function handleAppUninstall(data: any, merchant: any) {
+    console.log(`[App Uninstall] App uninstalled by merchant: ${merchant?.id}`);
+    
+    // يمكن هنا:
+    // 1. تنظيف البيانات المرتبطة بالمتجر
+    // 2. إرسال استبيان لسبب الإزالة
+    // 3. تحديث حالة الاشتراك
+  }
+
+  /**
+   * معالج حدث إنشاء منتج
+   */
+  async function handleProductCreate(data: any, merchant: any) {
+    console.log(`[Product Create] New product created: ${data?.id}`);
+    console.log(`[Product Create] Product name: ${data?.name}`);
+    
+    // يمكن هنا:
+    // 1. مزامنة المنتج مع قاعدة البيانات المحلية
+    // 2. تحسين SEO تلقائياً
+    // 3. إضافة وصف بالذكاء الاصطناعي
+    // 4. البحث عن صور إضافية
+  }
+
+  /**
+   * معالج حدث تحديث منتج
+   */
+  async function handleProductUpdate(data: any, merchant: any) {
+    console.log(`[Product Update] Product updated: ${data?.id}`);
+    console.log(`[Product Update] Product name: ${data?.name}`);
+    
+    // يمكن هنا:
+    // 1. تحديث المنتج في قاعدة البيانات المحلية
+    // 2. التحقق من تغييرات السعر
+    // 3. إشعار المشتركين بتغيير المنتج
+  }
+
+  /**
+   * معالج حدث إنشاء طلب
+   */
+  async function handleOrderCreate(data: any, merchant: any) {
+    console.log(`[Order Create] New order created: ${data?.id}`);
+    console.log(`[Order Create] Total: ${data?.total?.amount} ${data?.total?.currency}`);
+    
+    // يمكن هنا:
+    // 1. تسجيل الطلب في قاعدة البيانات
+    // 2. إرسال إشعار لصاحب المتجر
+    // 3. تحديث المخزون
+    // 4. إنشاء فاتورة
+  }
+
+  /**
+   * معالج حدث تحديث طلب
+   */
+  async function handleOrderUpdate(data: any, merchant: any) {
+    console.log(`[Order Update] Order updated: ${data?.id}`);
+    console.log(`[Order Update] Status: ${data?.status}`);
+    
+    // يمكن هنا:
+    // 1. تحديث حالة الطلب
+    // 2. إرسال إشعار للعميل
+    // 3. تحديث التقارير
+  }
+
+  // ============================================
+  // API لجلب أحداث Webhook (للإدارة)
+  // ============================================
+  
+  app.get("/api/admin/webhook-events", requireAdmin, async (req, res) => {
+    try {
+      const events = await db.select()
+        .from(sallaWebhookEvents)
+        .orderBy(desc(sallaWebhookEvents.createdAt))
+        .limit(100);
+      
+      res.json({ 
+        success: true, 
+        data: events,
+        count: events.length
+      });
+    } catch (e: any) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  // ============================================
+  // API لاختبار Webhook (للمطورين)
+  // ============================================
+  
+  app.post("/api/salla/webhook/test", async (req, res) => {
+    try {
+      const testEvent = {
+        event: req.body.event || 'product.create',
+        merchant: {
+          id: 12345,
+          name: 'متجر تجريبي'
+        },
+        data: req.body.data || {
+          id: 999,
+          name: 'منتج تجريبي',
+          price: { amount: 100, currency: 'SAR' }
+        },
+        created_at: new Date().toISOString(),
+        id: `test_${Date.now()}`
+      };
+
+      console.log(`[Webhook Test] Sending test event:`, testEvent);
+
+      // محاكاة إرسال Webhook
+      const response = await fetch(`${req.protocol}://${req.get('host')}/api/salla/webhook`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(testEvent)
+      });
+
+      const result = await response.json();
+
+      res.json({
+        success: true,
+        message: "Test webhook sent successfully",
+        testEvent,
+        response: result
+      });
+    } catch (error: any) {
+      console.error("[Webhook Test] Error:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
     }
   });
 

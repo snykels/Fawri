@@ -107,3 +107,18 @@ export type SallaToken = typeof sallaTokens.$inferSelect;
 
 export const insertUploadedProductSchema = createInsertSchema(uploadedProducts);
 export type UploadedProduct = typeof uploadedProducts.$inferSelect;
+
+// جدول أحداث Webhook من سلة
+export const sallaWebhookEvents = sqliteTable("salla_webhook_events", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  merchantId: text("merchant_id"),
+  eventType: text("event_type").notNull(), // مثل: product.create, order.create, app.install
+  eventId: text("event_id"), // معرف الحدث من سلة
+  payload: text("payload", { mode: "json" }), // البيانات الكاملة للحدث
+  processed: integer("processed", { mode: "boolean" }).default(false).notNull(),
+  processedAt: integer("processed_at", { mode: "timestamp" }),
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()).notNull(),
+});
+
+export const insertSallaWebhookEventSchema = createInsertSchema(sallaWebhookEvents);
+export type SallaWebhookEvent = typeof sallaWebhookEvents.$inferSelect;
