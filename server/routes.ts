@@ -8,7 +8,7 @@ import fs from "fs";
 import { productDataSchema, type ProductData } from "@shared/schema";
 import { image_search } from "duckduckgo-images-api";
 import { db } from "./db";
-import { uploadedProducts, sallaTokens, sallaWebhookEvents } from "@shared/schema";
+import { uploadedProducts, sallaTokens, sallaWebhookEvents, users } from "@shared/schema";
 import { eq, desc } from "drizzle-orm";
 import session from "express-session";
 import createMemoryStore from "memorystore";
@@ -297,6 +297,116 @@ export async function registerRoutes(
     return res.status(401).json({ success: false, message: "Unauthorized" });
   };
 
+  // Middleware للتحقق من هوية المستخدم (العميل)
+  const requireUser = async (req: any, res: any, next: any) => {
+    try {
+      // التحقق من وجود معرف المستخدم في الجلسة
+      const userId = req.session?.userId;
+      
+      if (!userId) {
+        return res.status(401).json({ 
+          success: false, 
+          message: "يجب تسجيل الدخول أولاً",
+          requireLogin: true
+        });
+      }
+
+      // جلب بيانات المستخدم من قاعدة البيانات
+      const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+      
+      if (user.length === 0 || !user[0].isActive) {
+        // حذف الجلسة إذا كان المستخدم غير موجود أو غير نشط
+        req.session.destroy(() => {});
+        return res.status(401).json({ 
+          success: false, 
+          message: "جلسة منتهية، يرجى تسجيل الدخول مرة أخرى",
+          requireLogin: true
+        });
+      }
+
+      // التحقق من صلاحية توكن سلة
+      const now = new Date();
+      const expiresAt = user[0].sallaTokenExpiresAt;
+      
+      if (expiresAt && now >= expiresAt) {
+        // التوكن منتهي الصلاحية - محاولة التحديث
+        console.log(`[Auth] Token expired for user ${user[0].email}, attempting refresh...`);
+        
+        if (user[0].sallaRefreshToken) {
+          try {
+            const SALLA_CLIENT_ID = process.env.SALLA_CLIENT_ID || "3b98cad1-c0ea-415c-9a98-f9288cc95365";
+            const SALLA_SECRET_KEY = process.env.SALLA_SECRET_KEY || "1ad23a9c67438be75908c28ba0ce500f294609933dfebc50d80a95cb0fc14ee0";
+            
+            const refreshResponse = await fetch("https://accounts.salla.sa/oauth2/token", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Accept": "application/json",
+              },
+              body: new URLSearchParams({
+                grant_type: "refresh_token",
+                refresh_token: user[0].sallaRefreshToken,
+                client_id: SALLA_CLIENT_ID,
+                client_secret: SALLA_SECRET_KEY,
+              }),
+            });
+
+            if (refreshResponse.ok) {
+              const refreshData = await refreshResponse.json();
+              
+              // تحديث التوكنات في قاعدة البيانات
+              await db.update(users)
+                .set({
+                  sallaAccessToken: refreshData.access_token,
+                  sallaRefreshToken: refreshData.refresh_token,
+                  sallaTokenExpiresAt: new Date(Date.now() + refreshData.expires_in * 1000),
+                  updatedAt: new Date(),
+                })
+                .where(eq(users.id, userId));
+              
+              console.log(`[Auth] Token refreshed successfully for user ${user[0].email}`);
+            } else {
+              // فشل التحديث - حذف الجلسة
+              console.error(`[Auth] Failed to refresh token for user ${user[0].email}`);
+              req.session.destroy(() => {});
+              return res.status(401).json({ 
+                success: false, 
+                message: "انتهت صلاحية الجلسة، يرجى تسجيل الدخول مرة أخرى",
+                requireLogin: true
+              });
+            }
+          } catch (refreshError) {
+            console.error(`[Auth] Error refreshing token:`, refreshError);
+            req.session.destroy(() => {});
+            return res.status(401).json({ 
+              success: false, 
+              message: "حدث خطأ في تحديث الجلسة، يرجى تسجيل الدخول مرة أخرى",
+              requireLogin: true
+            });
+          }
+        } else {
+          // لا يوجد refresh token
+          req.session.destroy(() => {});
+          return res.status(401).json({ 
+            success: false, 
+            message: "انتهت صلاحية الجلسة، يرجى تسجيل الدخول مرة أخرى",
+            requireLogin: true
+          });
+        }
+      }
+
+      // إضافة بيانات المستخدم إلى الطلب
+      req.user = user[0];
+      next();
+    } catch (error) {
+      console.error("[Auth] Error in requireUser middleware:", error);
+      return res.status(500).json({ 
+        success: false, 
+        message: "حدث خطأ في التحقق من الهوية" 
+      });
+    }
+  };
+
   app.get("/api/admin/products", requireAdmin, async (req, res) => {
     try {
       const products = await db.select().from(uploadedProducts).orderBy(desc(uploadedProducts.uploadedAt));
@@ -403,6 +513,55 @@ export async function registerRoutes(
       const tokens = await exchangeCodeForTokens(code as string, state as string);
       
       if (tokens) {
+        // جلب معلومات التاجر من سلة
+        try {
+          const merchantResponse = await fetch("https://api.salla.dev/admin/v2/store", {
+            headers: {
+              "Authorization": `Bearer ${tokens.access_token}`,
+              "Accept": "application/json"
+            }
+          });
+          
+          if (merchantResponse.ok) {
+            const merchantData = await merchantResponse.json();
+            const merchantEmail = merchantData.data?.email || `merchant_${Date.now()}@salla.com`;
+            const merchantName = merchantData.data?.name || "تاجر سلة";
+            const merchantId = merchantData.data?.id?.toString();
+            
+            // التحقق من وجود المستخدم أو إنشاء واحد جديد
+            const existingUser = await db.select().from(users).where(eq(users.email, merchantEmail)).limit(1);
+            
+            if (existingUser.length === 0) {
+              // إنشاء مستخدم جديد
+              await db.insert(users).values({
+                email: merchantEmail,
+                name: merchantName,
+                sallaMerchantId: merchantId,
+                sallaAccessToken: tokens.access_token,
+                sallaRefreshToken: tokens.refresh_token,
+                sallaTokenExpiresAt: new Date(Date.now() + tokens.expires_in * 1000),
+              });
+              console.log(`[OAuth Callback] New user created: ${merchantEmail}`);
+            } else {
+              // تحديث بيانات المستخدم الموجود
+              await db.update(users)
+                .set({
+                  name: merchantName,
+                  sallaMerchantId: merchantId,
+                  sallaAccessToken: tokens.access_token,
+                  sallaRefreshToken: tokens.refresh_token,
+                  sallaTokenExpiresAt: new Date(Date.now() + tokens.expires_in * 1000),
+                  updatedAt: new Date(),
+                })
+                .where(eq(users.email, merchantEmail));
+              console.log(`[OAuth Callback] User updated: ${merchantEmail}`);
+            }
+          }
+        } catch (merchantErr) {
+          console.error("[OAuth Callback] Failed to fetch merchant info:", merchantErr);
+          // لا نفشل العملية إذا فشل جلب معلومات التاجر
+        }
+        
         res.json({ 
           success: true, 
           message: "Salla OAuth2 tokens saved successfully. The system will automatically refresh tokens when needed." 
@@ -431,6 +590,201 @@ export async function registerRoutes(
     } catch (err: any) {
       console.error("Error generating auth URL:", err);
       res.status(500).json({ success: false, message: "Failed to generate authorization URL" });
+    }
+  });
+
+  // --- USER AUTHENTICATION ROUTES ---
+  
+  // الحصول على معلومات المستخدم الحالي
+  app.get("/api/user/me", requireUser, async (req: any, res) => {
+    try {
+      const user = req.user;
+      
+      // عدم إرجاع التوكنات في الاستجابة للأمان
+      res.json({
+        success: true,
+        data: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          sallaMerchantId: user.sallaMerchantId,
+          isActive: user.isActive,
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt
+        }
+      });
+    } catch (error: any) {
+      console.error("[User API] Error fetching user info:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: "حدث خطأ في جلب معلومات المستخدم" 
+      });
+    }
+  });
+
+  // تسجيل خروج المستخدم
+  app.post("/api/user/logout", async (req: any, res) => {
+    try {
+      req.session.destroy(() => {
+        res.json({ success: true, message: "تم تسجيل الخروج بنجاح" });
+      });
+    } catch (error: any) {
+      console.error("[User API] Error logging out:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: "حدث خطأ في تسجيل الخروج" 
+      });
+    }
+  });
+
+  // التحقق من حالة المصادقة
+  app.get("/api/user/check-auth", async (req: any, res) => {
+    try {
+      const userId = req.session?.userId;
+      
+      if (!userId) {
+        return res.json({ 
+          success: false, 
+          isAuthenticated: false,
+          message: "غير مسجل الدخول" 
+        });
+      }
+
+      const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+      
+      if (user.length === 0 || !user[0].isActive) {
+        req.session.destroy(() => {});
+        return res.json({ 
+          success: false, 
+          isAuthenticated: false,
+          message: "المستخدم غير موجود أو غير نشط" 
+        });
+      }
+
+      res.json({
+        success: true,
+        isAuthenticated: true,
+        data: {
+          id: user[0].id,
+          email: user[0].email,
+          name: user[0].name,
+          sallaMerchantId: user[0].sallaMerchantId
+        }
+      });
+    } catch (error: any) {
+      console.error("[User API] Error checking auth:", error);
+      res.status(500).json({ 
+        success: false, 
+        isAuthenticated: false,
+        message: "حدث خطأ في التحقق من المصادقة" 
+      });
+    }
+  });
+
+  // جلب منتجات المستخدم الحالي
+  app.get("/api/user/products", requireUser, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      
+      // للآن نرجع جميع المنتجات - يمكن لاحقاً تصفية حسب المستخدم
+      const products = await db.select()
+        .from(uploadedProducts)
+        .orderBy(desc(uploadedProducts.uploadedAt));
+      
+      res.json({ 
+        success: true, 
+        data: products 
+      });
+    } catch (error: any) {
+      console.error("[User API] Error fetching products:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: "حدث خطأ في جلب المنتجات" 
+      });
+    }
+  });
+
+  // نشر منتج للمستخدم الحالي
+  app.post("/api/user/publish", requireUser, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const { productName, frontImage, backImage } = req.body;
+
+      if (!productName || typeof productName !== "string") {
+        return res.status(400).json({
+          success: false,
+          error: "اسم المنتج مطلوب",
+        });
+      }
+
+      console.log(`[User Publish] User ${userId} publishing: ${productName}`);
+
+      // استيراد خدمة النشر
+      const { processAndPublish } = await import("./salla-publisher");
+
+      // معالجة الصور إذا تم توفيرها
+      let frontImageBase64: string | undefined;
+      let backImageBase64: string | undefined;
+
+      if (frontImage && typeof frontImage === "string") {
+        frontImageBase64 = frontImage.replace(/^data:image\/\w+;base64,/, "");
+      }
+
+      if (backImage && typeof backImage === "string") {
+        backImageBase64 = backImage.replace(/^data:image\/\w+;base64,/, "");
+      }
+
+      // تنفيذ العملية الكاملة
+      const result = await processAndPublish(
+        productName,
+        frontImageBase64,
+        backImageBase64
+      );
+
+      if (!result.success) {
+        return res.status(500).json({
+          success: false,
+          error: result.error || "فشلت عملية النشر",
+        });
+      }
+
+      return res.json({
+        success: true,
+        data: {
+          productName: result.productData?.productName,
+          seoTitle: result.productData?.seoTitle,
+          description: result.productData?.description,
+          sku: result.productData?.sku,
+          barcode: result.productData?.barcode,
+          images: result.productData?.images,
+          sallaProductId: result.sallaProductId,
+        },
+        message: "تم نشر المنتج على سلة بنجاح",
+      });
+    } catch (error: any) {
+      console.error("[User Publish] Error:", error);
+      return res.status(500).json({
+        success: false,
+        error: error.message || "حدث خطأ في عملية النشر",
+      });
+    }
+  });
+
+  // الحصول على رابط تفويض سلة للمستخدم
+  app.get("/api/user/salla/auth-url", requireUser, async (req: any, res) => {
+    try {
+      const { getAuthorizationUrl } = await import("./salla-oauth");
+      const redirectUri = `https://upload.fawri.cloud/api/salla/callback`;
+      const authUrl = getAuthorizationUrl(redirectUri);
+      
+      res.json({ 
+        success: true, 
+        authUrl,
+        message: "قم بزيارة الرابط لتفويض حساب سلة"
+      });
+    } catch (err: any) {
+      console.error("[User Auth] Error generating auth URL:", err);
+      res.status(500).json({ success: false, message: "فشل في إنشاء رابط التفويض" });
     }
   });
 

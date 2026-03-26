@@ -11,6 +11,24 @@ export default function LoginPage() {
   const { isEnglish, toggleLanguage } = useLanguage();
   const { theme } = useTheme();
 
+  const handleSallaLogin = async () => {
+    try {
+      // جلب رابط التفويض من الخادم
+      const response = await fetch('/api/salla/auth-url');
+      const data = await response.json();
+      
+      if (data.success && data.authUrl) {
+        // توجيه المستخدم إلى صفحة تفويض سلة
+        window.location.href = data.authUrl;
+      } else {
+        alert(isEnglish ? 'Failed to get authorization URL' : 'فشل في الحصول على رابط التفويض');
+      }
+    } catch (error) {
+      console.error('Error getting auth URL:', error);
+      alert(isEnglish ? 'An error occurred' : 'حدث خطأ');
+    }
+  };
+
   return (
     <div className="relative flex min-h-screen items-center justify-center p-4 bg-background overflow-hidden font-sans">
       <div className="ambient-glow" />
@@ -50,7 +68,7 @@ export default function LoginPage() {
             {/* Login with Salla Button */}
             <Button 
                 size="lg" 
-                onClick={() => setLocation("/")}
+                onClick={handleSallaLogin}
                 className="w-full h-14 bg-[#00b289] hover:bg-[#008f6e] text-white shadow-xl shadow-[#00b289]/20 hover:scale-[1.02] active:scale-[0.98] transition-all rounded-2xl flex items-center justify-center gap-3 font-bold text-lg"
             >
                 <img src="https://salla.network/cdn/images/salla-logo-white.svg" alt="Salla Logo" className="w-6 h-6 object-contain" />

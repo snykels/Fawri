@@ -122,3 +122,36 @@ export const sallaWebhookEvents = sqliteTable("salla_webhook_events", {
 
 export const insertSallaWebhookEventSchema = createInsertSchema(sallaWebhookEvents);
 export type SallaWebhookEvent = typeof sallaWebhookEvents.$inferSelect;
+
+// جدول المستخدمين/العملاء
+export const users = sqliteTable("users", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  email: text("email").notNull().unique(),
+  name: text("name"),
+  sallaMerchantId: text("salla_merchant_id"),
+  sallaAccessToken: text("salla_access_token"),
+  sallaRefreshToken: text("salla_refresh_token"),
+  sallaTokenExpiresAt: integer("salla_token_expires_at", { mode: "timestamp" }),
+  isActive: integer("is_active", { mode: "boolean" }).default(true).notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()).notNull(),
+});
+
+export const insertUserSchema = createInsertSchema(users);
+export type User = typeof users.$inferSelect;
+
+// تحديث جدول المنتجات لإضافة معرف المستخدم
+export const uploadedProductsWithUser = sqliteTable("uploaded_products", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: integer("user_id").references(() => users.id),
+  productName: text("product_name").notNull(),
+  sku: text("sku"),
+  barcode: text("barcode"),
+  frontImageUrl: text("front_image_url"),
+  backImageUrl: text("back_image_url"),
+  isSynced: integer("is_synced", { mode: "boolean" }).default(false).notNull(),
+  uploadedAt: integer("uploaded_at", { mode: "timestamp" }).$defaultFn(() => new Date()).notNull(),
+  syncedAt: integer("synced_at", { mode: "timestamp" }),
+  productData: text("product_data", { mode: "json" }),
+  sallaProductId: text("salla_product_id"),
+});
