@@ -6,6 +6,8 @@
  * 2. نفذ السكريبت: npx tsx test-salla-publish.ts
  */
 
+import 'dotenv/config';
+
 const BASE_URL = process.env.TEST_BASE_URL || 'https://upload.fawri.cloud';
 
 interface PublishResult {
