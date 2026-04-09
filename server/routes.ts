@@ -8,7 +8,7 @@ import fs from "fs";
 import { productDataSchema, type ProductData } from "@shared/schema";
 import { image_search } from "duckduckgo-images-api";
 import { db } from "./db";
-import { uploadedProducts, sallaTokens, sallaWebhookEvents, users } from "@shared/schema";
+import { uploadedProducts, sallaTokens, sallaWebhookEvents, users, sallaCategories } from "@shared/schema";
 import { eq, desc } from "drizzle-orm";
 import session from "express-session";
 import createMemoryStore from "memorystore";
@@ -272,8 +272,8 @@ export async function registerRoutes(
   app.use("/uploads", express.static(uploadsDir));
 
   // Salla Credentials from Environment Variables or hardcoded fallbacks
-  const SALLA_CLIENT_ID = process.env.SALLA_CLIENT_ID || "3b98cad1-c0ea-415c-9a98-f9288cc95365";
-  const SALLA_SECRET_KEY = process.env.SALLA_SECRET_KEY || "1ad23a9c67438be75908c28ba0ce500f294609933dfebc50d80a95cb0fc14ee0";
+  const SALLA_CLIENT_ID = process.env.SALLA_CLIENT_ID || "2e07dd96-250d-477f-baff-2b2b7ed9f4e7";
+  const SALLA_SECRET_KEY = process.env.SALLA_SECRET_KEY || "d8737751cc86dc78eb8e6cab321a5f416b328992fbd197c0247df509d71be805";
 
   app.post("/api/admin/login", (req, res) => {
     const { username, password } = req.body;
@@ -334,8 +334,8 @@ export async function registerRoutes(
         
         if (user[0].sallaRefreshToken) {
           try {
-            const SALLA_CLIENT_ID = process.env.SALLA_CLIENT_ID || "3b98cad1-c0ea-415c-9a98-f9288cc95365";
-            const SALLA_SECRET_KEY = process.env.SALLA_SECRET_KEY || "1ad23a9c67438be75908c28ba0ce500f294609933dfebc50d80a95cb0fc14ee0";
+            const SALLA_CLIENT_ID = process.env.SALLA_CLIENT_ID || "2e07dd96-250d-477f-baff-2b2b7ed9f4e7";
+            const SALLA_SECRET_KEY = process.env.SALLA_SECRET_KEY || "d8737751cc86dc78eb8e6cab321a5f416b328992fbd197c0247df509d71be805";
             
             const refreshResponse = await fetch("https://accounts.salla.sa/oauth2/token", {
               method: "POST",
@@ -583,13 +583,13 @@ export async function registerRoutes(
         // تعيين جلسة للمستخدم
         req.session.userId = userId;
         
-        res.json({ 
-          success: true, 
-          message: "تم تسجيل الدخول بنجاح",
-          userId: userId,
-        });
+        // إعادة التوجيه إلى صفحة النجاح في الواجهة الأمامية
+        const frontendUrl = process.env.VITE_API_BASE_URL || "https://upload.fawri.cloud";
+        return res.redirect(`${frontendUrl}/salla-callback?success=true&userId=${userId}`);
       } else {
-        res.status(500).json({ success: false, message: "Failed to exchange authorization code for tokens" });
+        // إعادة التوجيه إلى صفحة الخطأ
+        const frontendUrl = process.env.VITE_API_BASE_URL || "https://upload.fawri.cloud";
+        return res.redirect(`${frontendUrl}/salla-callback?error=Failed to exchange authorization code`);
       }
     } catch (err: any) {
       console.error("Salla OAuth2 callback error:", err);
@@ -2314,6 +2314,182 @@ export async function registerRoutes(
       res.status(500).json({
         success: false,
         error: error.message
+      });
+    }
+  });
+
+  /**
+   * جلب وتصنيف الأقسام من متجر سلة (للمستخدمين)
+   */
+  app.get("/api/salla/categories", requireUser, async (req: any, res) => {
+    try {
+      const user = req.user;
+      
+      if (!user.sallaAccessToken) {
+        return res.status(403).json({
+          success: false,
+          error: "يجب ربط حساب سلة أولاً",
+        });
+      }
+
+      console.log("[Categories] Fetching from Salla for merchant:", user.sallaMerchantId);
+
+      const response = await fetch("https://api.salla.dev/admin/v2/categories", {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${user.sallaAccessToken}`,
+          "Accept": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("[Categories] Salla API error:", response.status, errorText);
+        return res.status(response.status).json({
+          success: false,
+          error: `فشل في جلب التصنيفات: ${response.status}`,
+        });
+      }
+
+      const data = await response.json();
+      const categories = data.data || [];
+
+      console.log(`[Categories] Found ${categories.length} categories from Salla`);
+
+      // حفظ التصنيفات في قاعدة البيانات
+      for (const cat of categories) {
+        const categoryData = {
+          sallaCategoryId: cat.id?.toString() || "",
+          name: cat.name || "",
+          nameEn: cat.name_en || "",
+          parentId: cat.parent_id?.toString() || null,
+          merchantId: user.sallaMerchantId || "",
+          productCount: cat.products_count || 0,
+          lastSyncedAt: new Date(),
+        };
+
+        const existing = await db.select()
+          .from(sallaCategories)
+          .where(eq(sallaCategories.sallaCategoryId, categoryData.sallaCategoryId))
+          .where(eq(sallaCategories.merchantId, user.sallaMerchantId || ""))
+          .limit(1);
+
+        if (existing.length > 0) {
+          await db.update(sallaCategories)
+            .set(categoryData)
+            .where(eq(sallaCategories.sallaCategoryId, categoryData.sallaCategoryId))
+            .where(eq(sallaCategories.merchantId, user.sallaMerchantId || ""));
+        } else {
+          await db.insert(sallaCategories).values(categoryData);
+        }
+      }
+
+      return res.json({
+        success: true,
+        data: categories,
+        count: categories.length,
+      });
+    } catch (error: any) {
+      console.error("[Categories] Error:", error);
+      return res.status(500).json({
+        success: false,
+        error: error.message || "حدث خطأ في جلب التصنيفات",
+      });
+    }
+  });
+
+  /**
+   * جلب وتصنيف الأقسام من متجر سلة (للمشرف باستخدام التوكن العام)
+   */
+  app.get("/api/admin/salla/categories", requireAdmin, async (req: any, res) => {
+    try {
+      const { getValidAccessToken } = await import("./salla-oauth");
+      const accessToken = await getValidAccessToken();
+      
+      if (!accessToken) {
+        return res.status(403).json({
+          success: false,
+          error: "لا يوجد توكن صالح. يرجى تسجيل الدخول عبر سلة كملف.",
+        });
+      }
+
+      console.log("[Admin Categories] Fetching from Salla with admin token");
+
+      const response = await fetch("https://api.salla.dev/admin/v2/categories", {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${accessToken}`,
+          "Accept": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("[Admin Categories] Salla API error:", response.status, errorText);
+        return res.status(response.status).json({
+          success: false,
+          error: `فشل في جلب التصنيفات: ${response.status}`,
+        });
+      }
+
+      const data = await response.json();
+      const categories = data.data || [];
+
+      console.log(`[Admin Categories] Found ${categories.length} categories from Salla`);
+
+      return res.json({
+        success: true,
+        data: categories,
+        count: categories.length,
+      });
+    } catch (error: any) {
+      console.error("[Admin Categories] Error:", error);
+      return res.status(500).json({
+        success: false,
+        error: error.message || "حدث خطأ في جلب التصنيفات",
+      });
+    }
+  });
+
+  /**
+   * الحصول على قائمة التصنيفات المحفوظة (مسطحة)
+   */
+  app.get("/api/salla/categories/list", requireUser, async (req: any, res) => {
+    try {
+      const user = req.user;
+      
+      const categories = await db.select()
+        .from(sallaCategories)
+        .where(eq(sallaCategories.merchantId, user.sallaMerchantId || ""))
+        .orderBy(desc(sallaCategories.productCount));
+
+      // تجهيز هيكل شجري
+      const categoryMap = new Map();
+      const rootCategories: any[] = [];
+
+      for (const cat of categories) {
+        categoryMap.set(cat.sallaCategoryId, { ...cat, children: [] });
+      }
+
+      for (const cat of categories) {
+        const category = categoryMap.get(cat.sallaCategoryId);
+        if (cat.parentId && categoryMap.has(cat.parentId)) {
+          categoryMap.get(cat.parentId).children.push(category);
+        } else {
+          rootCategories.push(category);
+        }
+      }
+
+      return res.json({
+        success: true,
+        data: rootCategories,
+        flatData: categories,
+      });
+    } catch (error: any) {
+      console.error("[Categories List] Error:", error);
+      return res.status(500).json({
+        success: false,
+        error: error.message || "حدث خطأ",
       });
     }
   });

@@ -123,6 +123,21 @@ export const sallaWebhookEvents = sqliteTable("salla_webhook_events", {
 export const insertSallaWebhookEventSchema = createInsertSchema(sallaWebhookEvents);
 export type SallaWebhookEvent = typeof sallaWebhookEvents.$inferSelect;
 
+// جدول التصنيفات المستوردة من سلة
+export const sallaCategories = sqliteTable("salla_categories", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  sallaCategoryId: text("salla_category_id").notNull(),
+  name: text("name").notNull(),
+  nameEn: text("name_en"),
+  parentId: text("parent_id"),
+  merchantId: text("merchant_id"),
+  productCount: integer("product_count").default(0),
+  lastSyncedAt: integer("last_synced_at", { mode: "timestamp" }).$defaultFn(() => new Date()).notNull(),
+});
+
+export const insertSallaCategorySchema = createInsertSchema(sallaCategories);
+export type SallaCategory = typeof sallaCategories.$inferSelect;
+
 // جدول المستخدمين/العملاء
 export const users = sqliteTable("users", {
   id: integer("id").primaryKey({ autoIncrement: true }),

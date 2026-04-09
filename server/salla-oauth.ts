@@ -7,8 +7,8 @@ import { db } from "./db";
 import { sallaTokens } from "@shared/schema";
 import { eq, desc } from "drizzle-orm";
 
-const SALLA_CLIENT_ID = process.env.SALLA_CLIENT_ID || "3b98cad1-c0ea-415c-9a98-f9288cc95365";
-const SALLA_SECRET_KEY = process.env.SALLA_SECRET_KEY || "1ad23a9c67438be75908c28ba0ce500f294609933dfebc50d80a95cb0fc14ee0";
+const SALLA_CLIENT_ID = process.env.SALLA_CLIENT_ID || "2e07dd96-250d-477f-baff-2b2b7ed9f4e7";
+const SALLA_SECRET_KEY = process.env.SALLA_SECRET_KEY || "d8737751cc86dc78eb8e6cab321a5f416b328992fbd197c0247df509d71be805";
 const SALLA_TOKEN_URL = "https://accounts.salla.sa/oauth2/token";
 const SALLA_API_BASE = "https://api.salla.dev/admin/v2";
 

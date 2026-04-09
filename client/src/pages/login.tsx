@@ -34,14 +34,11 @@ export default function LoginPage() {
 
   const handleSallaLogin = async () => {
     try {
-      // جلب رابط التفويض من الخادم (endpoint للمستخدمين)
-      // نقوم بتعديل redirect_uri ليذهب إلى صفحة callback في واجهة المستخدم
       const redirectUri = `${window.location.origin}/salla-callback`;
-      const response = await fetch(`/api/user/salla/auth-url?redirect_uri=${encodeURIComponent(redirectUri)}`);
+      const response = await fetch(`/api/salla/auth-url?redirect_uri=${encodeURIComponent(redirectUri)}`);
       const data = await response.json();
       
       if (data.success && data.authUrl) {
-        // توجيه المستخدم إلى صفحة تفويض سلة
         window.location.href = data.authUrl;
       } else {
         alert(isEnglish ? 'Failed to get authorization URL' : 'فشل في الحصول على رابط التفويض');

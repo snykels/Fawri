@@ -38,69 +38,90 @@ interface ProductGenerationResult {
   brand: string;
 }
 
+const MODELS_TO_TRY = [
+  "gemini-2.0-flash-exp",
+  "gemini-1.5-flash",
+  "gemini-flash-latest"
+];
+
 /**
- * تحليل المنتج وتوليد المحتوى باستخدام Gemini
+ * تحليل المنتج وتوليد المحتوى باستخدام Gemini مع Retry
  */
 export async function generateProductContent(
   productNameInput: string,
-  ocrText: string = ""
+  ocrText: string = "",
+  maxRetries: number = 3
 ): Promise<ProductGenerationResult | null> {
-  try {
-    const geminiApiKey = process.env.AI_INTEGRATIONS_GEMINI_API_KEY;
-    if (!geminiApiKey) {
-      console.error("[Salla Publisher] Gemini API key not configured");
-      return null;
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    for (const model of MODELS_TO_TRY) {
+      try {
+        const geminiApiKey = process.env.AI_INTEGRATIONS_GEMINI_API_KEY;
+        if (!geminiApiKey) {
+          console.error("[Salla Publisher] Gemini API key not configured");
+          return null;
+        }
+
+        console.log(`[Salla Publisher] Generating content for: ${productNameInput} (trying ${model})`);
+
+        const prompt = buildProductPrompt(productNameInput, ocrText);
+        const ai = new GoogleGenAI({ apiKey: geminiApiKey });
+
+        const response = await ai.models.generateContent({
+          model: model,
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+        });
+
+        const content = response.text;
+        if (!content) {
+          console.error("[Salla Publisher] No response from Gemini");
+          continue;
+        }
+
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+          console.error("[Salla Publisher] No JSON found in response");
+          continue;
+        }
+
+        const productData = JSON.parse(jsonMatch[0]);
+
+        console.log("[Salla Publisher] Searching for product images...");
+        const brand = productData.brand || "";
+        const productName = productData.product_name_en || productData.product_name || "";
+        const images = await searchProductImages(brand, productName);
+
+        return {
+          productName: productData.product_name || productNameInput,
+          seoTitle: productData.seo_title || "",
+          description: productData.full_description || productData.marketing_description || "",
+          sku: productData.sku || generateSKU(productData.barcode),
+          barcode: productData.barcode || "",
+          images: images.slice(0, 5),
+          category: productData.category || "إلكترونيات",
+          brand: brand,
+        };
+      } catch (error: any) {
+        console.warn(`[Salla Publisher] Model ${model} failed:`, error.message);
+        lastError = error;
+        
+        if (error.status === 503 || error.message?.includes("high demand")) {
+          await new Promise(resolve => setTimeout(resolve, 2000 * (attempt + 1)));
+          continue;
+        }
+        
+        if (error.status === 404) {
+          continue;
+        }
+        
+        throw error;
+      }
     }
-
-    console.log(`[Salla Publisher] Generating content for: ${productNameInput}`);
-
-    // بناء البرومبت
-    const prompt = buildProductPrompt(productNameInput, ocrText);
-
-    // إنشاء عميل Gemini
-    const ai = new GoogleGenAI({ apiKey: geminiApiKey });
-
-    // توليد المحتوى
-    const response = await ai.models.generateContent({
-      model: "gemini-flash-latest",
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-    });
-
-    const content = response.text;
-    if (!content) {
-      console.error("[Salla Publisher] No response from Gemini");
-      return null;
-    }
-
-    // استخراج JSON من الاستجابة
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      console.error("[Salla Publisher] No JSON found in response");
-      return null;
-    }
-
-    const productData = JSON.parse(jsonMatch[0]);
-
-    // البحث عن صور المنتج
-    console.log("[Salla Publisher] Searching for product images...");
-    const brand = productData.brand || "";
-    const productName = productData.product_name_en || productData.product_name || "";
-    const images = await searchProductImages(brand, productName);
-
-    return {
-      productName: productData.product_name || productNameInput,
-      seoTitle: productData.seo_title || "",
-      description: productData.full_description || productData.marketing_description || "",
-      sku: productData.sku || generateSKU(productData.barcode),
-      barcode: productData.barcode || "",
-      images: images.slice(0, 5), // أول 5 صور
-      category: productData.category || "إلكترونيات",
-      brand: brand,
-    };
-  } catch (error) {
-    console.error("[Salla Publisher] Error generating content:", error);
-    return null;
   }
+  
+  console.error("[Salla Publisher] All models failed:", lastError?.message);
+  return null;
 }
 
 /**
