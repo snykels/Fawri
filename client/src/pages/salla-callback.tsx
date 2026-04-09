@@ -42,7 +42,10 @@ export default function SallaCallbackPage() {
           }, 2000);
         } else {
           setStatus('error');
-          setMessage(data.message || (isEnglish ? 'Failed to connect to Salla' : 'فشل الاتصال بسلة'));
+          // عرض رسالة الخطأ من الخادم
+          const errorMessage = data.message || (isEnglish ? 'Failed to connect to Salla' : 'فشل الاتصال بسلة');
+          console.error('Callback API error:', data);
+          setMessage(errorMessage);
         }
       } catch (error) {
         console.error('Callback error:', error);

@@ -1,6 +1,6 @@
 /**
  * صفحة النشر المباشر على سلة
- * تتيح للمستخدم نشر المنتجات مباشرة دون الحاجة لرفع صورتين
+ * تتيح للمستخدم نشر المنتجات مباشرة على متجر سلة بعد تسجيل الدخول
  */
 
 import { useState, useEffect } from "react";
@@ -10,7 +10,16 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, Upload, CheckCircle2, XCircle, Image as ImageIcon } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Loader2, Upload, CheckCircle2, XCircle, Image as ImageIcon, Store, Link2 } from "lucide-react";
+
+interface SallaUser {
+  id: number;
+  email: string;
+  name: string;
+  sallaMerchantId: string | null;
+  isActive: boolean;
+}
 
 interface PublishResult {
   productName: string;
@@ -24,6 +33,7 @@ interface PublishResult {
 
 export default function PublishPage() {
   const [, setLocation] = useLocation();
+  const [sallaUser, setSallaUser] = useState<SallaUser | null>(null);
   const [productName, setProductName] = useState("");
   const [frontImage, setFrontImage] = useState<string | null>(null);
   const [backImage, setBackImage] = useState<string | null>(null);
@@ -40,6 +50,13 @@ export default function PublishPage() {
         if (!authData.isAuthenticated) {
           setLocation('/login');
           return;
+        }
+
+        // جلب بيانات المستخدم
+        const userResponse = await fetch('/api/user/me');
+        const userData = await userResponse.json();
+        if (userData.success) {
+          setSallaUser(userData.data);
         }
       } catch (error) {
         console.error('Auth check failed:', error);
@@ -70,12 +87,17 @@ export default function PublishPage() {
       return;
     }
 
+    if (!sallaUser?.sallaMerchantId) {
+      setError("يجب ربط حساب سلة أولاً قبل نشر المنتجات");
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     setResult(null);
 
     try {
-      const response = await fetch("/api/publish-to-salla", {
+      const response = await fetch("/api/user/publish", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -90,6 +112,11 @@ export default function PublishPage() {
       const data = await response.json();
 
       if (!response.ok || !data.success) {
+        // التحقق من الحاجة لإعادة الربط بسلة
+        if (data.requireSallaAuth) {
+          handleConnectSalla();
+          return;
+        }
         throw new Error(data.error || "فشلت عملية النشر");
       }
 
@@ -136,13 +163,74 @@ export default function PublishPage() {
     }
   };
 
+  // ربط حساب سلة
+  const handleConnectSalla = async () => {
+    try {
+      const response = await fetch('/api/user/salla/auth-url');
+      const data = await response.json();
+      if (data.success && data.authUrl) {
+        window.location.href = data.authUrl;
+      }
+    } catch (error) {
+      console.error('Error connecting Salla:', error);
+    }
+  };
+
+  // تسجيل الخروج
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/user/logout', { method: 'POST' });
+      setLocation('/login');
+    } catch (error) {
+      console.error('Error logging out:', error);
+    }
+  };
+
   return (
     <div className="container mx-auto py-8 px-4 max-w-4xl" dir="rtl">
+      {/* شريط العنوان مع حالة الربط بسلة */}
+      <div className="flex justify-between items-center mb-6">
+        <Button variant="outline" size="sm" onClick={handleLogout} className="gap-2">
+          تسجيل الخروج
+        </Button>
+        <div className="flex items-center gap-3">
+          {sallaUser?.sallaMerchantId ? (
+            <Badge variant="default" className="bg-green-600 gap-2">
+              <Link2 className="w-3 h-3" />
+              متصل بمتجر سلة
+            </Badge>
+          ) : (
+            <Badge variant="destructive" className="gap-2">
+              <Store className="w-3 h-3" />
+              غير متصل بسلة
+            </Badge>
+          )}
+          <Button variant="outline" size="sm" onClick={handleConnectSalla} className="gap-2">
+            <Store className="w-3 h-3" />
+            {sallaUser?.sallaMerchantId ? 'إعادة الاتصال' : 'ربط متجر سلة'}
+          </Button>
+        </div>
+      </div>
+
       <div className="text-center mb-8">
         <h1 className="text-3xl font-bold mb-2">النشر المباشر على سلة</h1>
         <p className="text-muted-foreground">
           أدخل اسم المنتج وسيقوم النظام تلقائياً بتوليد الوصف والبحث عن الصور والنشر على سلة
         </p>
+        {sallaUser && (
+          <p className="text-sm text-muted-foreground mt-2">
+            مرحباً {sallaUser.name} ({sallaUser.email})
+          </p>
+        )}
+        {!sallaUser?.sallaMerchantId && (
+          <Alert className="mt-4 max-w-lg mx-auto">
+            <Store className="h-4 w-4" />
+            <AlertTitle>تنبيه</AlertTitle>
+            <AlertDescription>
+              يجب ربط حساب سلة أولاً قبل إمكانية نشر المنتجات. اضغط على "ربط متجر سلة" في الأعلى.
+            </AlertDescription>
+          </Alert>
+        )}
       </div>
 
       <div className="grid gap-6">

@@ -499,12 +499,12 @@ export async function registerRoutes(
   });
 
   // --- SALLA OAUTH2 CALLBACK ROUTE ---
-  app.get("/api/salla/callback", async (req, res) => {
+  app.get("/api/salla/callback", async (req: any, res) => {
     try {
       const { code, state } = req.query;
       
       if (!code) {
-        return res.status(400).json({ success: false, message: "Authorization code is required" });
+        return res.status(400).json({ success: false, message: "رمز التفويض مطلوب" });
       }
 
       // استيراد دالة تبادل الكود
@@ -513,6 +513,10 @@ export async function registerRoutes(
       const tokens = await exchangeCodeForTokens(code as string, state as string);
       
       if (tokens) {
+        let merchantEmail = "";
+        let merchantName = "";
+        let merchantId = "";
+
         // جلب معلومات التاجر من سلة
         try {
           const merchantResponse = await fetch("https://api.salla.dev/admin/v2/store", {
@@ -524,47 +528,60 @@ export async function registerRoutes(
           
           if (merchantResponse.ok) {
             const merchantData = await merchantResponse.json();
-            const merchantEmail = merchantData.data?.email || `merchant_${Date.now()}@salla.com`;
-            const merchantName = merchantData.data?.name || "تاجر سلة";
-            const merchantId = merchantData.data?.id?.toString();
-            
-            // التحقق من وجود المستخدم أو إنشاء واحد جديد
-            const existingUser = await db.select().from(users).where(eq(users.email, merchantEmail)).limit(1);
-            
-            if (existingUser.length === 0) {
-              // إنشاء مستخدم جديد
-              await db.insert(users).values({
-                email: merchantEmail,
-                name: merchantName,
-                sallaMerchantId: merchantId,
-                sallaAccessToken: tokens.access_token,
-                sallaRefreshToken: tokens.refresh_token,
-                sallaTokenExpiresAt: new Date(Date.now() + tokens.expires_in * 1000),
-              });
-              console.log(`[OAuth Callback] New user created: ${merchantEmail}`);
-            } else {
-              // تحديث بيانات المستخدم الموجود
-              await db.update(users)
-                .set({
-                  name: merchantName,
-                  sallaMerchantId: merchantId,
-                  sallaAccessToken: tokens.access_token,
-                  sallaRefreshToken: tokens.refresh_token,
-                  sallaTokenExpiresAt: new Date(Date.now() + tokens.expires_in * 1000),
-                  updatedAt: new Date(),
-                })
-                .where(eq(users.email, merchantEmail));
-              console.log(`[OAuth Callback] User updated: ${merchantEmail}`);
-            }
+            merchantEmail = merchantData.data?.email || `merchant_${Date.now()}@salla.com`;
+            merchantName = merchantData.data?.name || "تاجر سلة";
+            merchantId = merchantData.data?.id?.toString();
           }
         } catch (merchantErr) {
           console.error("[OAuth Callback] Failed to fetch merchant info:", merchantErr);
-          // لا نفشل العملية إذا فشل جلب معلومات التاجر
+          // استخدام معلومات افتراضية إذا فشل جلب البيانات
+          merchantEmail = `merchant_${Date.now()}@salla.com`;
+          merchantName = "تاجر سلة";
+          merchantId = state as string || "";
         }
+        
+        // التحقق من وجود المستخدم أو إنشاء واحد جديد
+        const existingUser = await db.select().from(users).where(eq(users.email, merchantEmail)).limit(1);
+        
+        let userId: number;
+        
+        if (existingUser.length === 0) {
+          // إنشاء مستخدم جديد
+          const inserted = await db.insert(users).values({
+            email: merchantEmail,
+            name: merchantName,
+            sallaMerchantId: merchantId,
+            sallaAccessToken: tokens.access_token,
+            sallaRefreshToken: tokens.refresh_token,
+            sallaTokenExpiresAt: new Date(Date.now() + tokens.expires_in * 1000),
+          }).returning({ id: users.id });
+          
+          userId = inserted[0].id;
+          console.log(`[OAuth Callback] New user created: ${merchantEmail}, id: ${userId}`);
+        } else {
+          // تحديث بيانات المستخدم الموجود
+          userId = existingUser[0].id;
+          await db.update(users)
+            .set({
+              name: merchantName,
+              sallaMerchantId: merchantId,
+              sallaAccessToken: tokens.access_token,
+              sallaRefreshToken: tokens.refresh_token,
+              sallaTokenExpiresAt: new Date(Date.now() + tokens.expires_in * 1000),
+              updatedAt: new Date(),
+              isActive: true,
+            })
+            .where(eq(users.id, existingUser[0].id));
+          console.log(`[OAuth Callback] User updated: ${merchantEmail}, id: ${userId}`);
+        }
+
+        // تعيين جلسة للمستخدم
+        req.session.userId = userId;
         
         res.json({ 
           success: true, 
-          message: "Salla OAuth2 tokens saved successfully. The system will automatically refresh tokens when needed." 
+          message: "تم تسجيل الدخول بنجاح",
+          userId: userId,
         });
       } else {
         res.status(500).json({ success: false, message: "Failed to exchange authorization code for tokens" });
@@ -704,7 +721,7 @@ export async function registerRoutes(
     }
   });
 
-  // نشر منتج للمستخدم الحالي
+  // نشر منتج للمستخدم الحالي على متجر سلة الخاص به
   app.post("/api/user/publish", requireUser, async (req: any, res) => {
     try {
       const userId = req.user.id;
@@ -717,7 +734,17 @@ export async function registerRoutes(
         });
       }
 
-      console.log(`[User Publish] User ${userId} publishing: ${productName}`);
+      // التحقق من وجود توكن سلة للمستخدم
+      const user = req.user;
+      if (!user.sallaAccessToken) {
+        return res.status(403).json({
+          success: false,
+          error: "يجب ربط حساب سلة أولاً قبل نشر المنتجات",
+          requireSallaAuth: true,
+        });
+      }
+
+      console.log(`[User Publish] User ${userId} publishing to Salla: ${productName}`);
 
       // استيراد خدمة النشر
       const { processAndPublish } = await import("./salla-publisher");
@@ -734,11 +761,12 @@ export async function registerRoutes(
         backImageBase64 = backImage.replace(/^data:image\/\w+;base64,/, "");
       }
 
-      // تنفيذ العملية الكاملة
+      // تنفيذ العملية الكاملة مع تمرير توكن المستخدم
       const result = await processAndPublish(
         productName,
         frontImageBase64,
-        backImageBase64
+        backImageBase64,
+        user.sallaAccessToken
       );
 
       if (!result.success) {

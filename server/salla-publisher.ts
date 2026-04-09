@@ -116,14 +116,21 @@ function generateSKU(barcode?: string): string {
 
 /**
  * نشر المنتج على سلة
+ * @param productData بيانات المنتج
+ * @param accessToken توكن الوصول الخاص بالمستخدم (إذا لم يتم تحديده يستخدم التوكن العام)
  */
 export async function publishToSalla(
-  productData: ProductGenerationResult
+  productData: ProductGenerationResult,
+  accessToken?: string | null
 ): Promise<{ success: boolean; productId?: string; error?: string }> {
   try {
-    // الحصول على توكن صالح
-    const accessToken = await getValidAccessToken();
-    if (!accessToken) {
+    // الحصول على توكن صالح - إما التوكن المحدد أو التوكن العام
+    let token = accessToken || undefined;
+    if (!token) {
+      token = await getValidAccessToken() || undefined;
+    }
+    
+    if (!token) {
       return {
         success: false,
         error: "لا يوجد توكن صالح لسلة. يرجى تسجيل الدخول أولاً.",
@@ -158,7 +165,7 @@ export async function publishToSalla(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
+        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify(payload),
     });
@@ -166,9 +173,23 @@ export async function publishToSalla(
     if (!response.ok) {
       const errorText = await response.text();
       console.error("[Salla Publisher] API error:", response.status, errorText);
+      let errorMessage = `فشل النشر على سلة: ${response.status}`;
+      
+      // تحليل رسالة الخطأ من سلة
+      try {
+        const errorJson = JSON.parse(errorText);
+        if (errorJson.message) {
+          errorMessage = `فشل النشر على سلة: ${errorJson.message}`;
+        } else if (errorJson.error) {
+          errorMessage = `فشل النشر على سلة: ${errorJson.error}`;
+        }
+      } catch {
+        // تجاهل خطأ التحليل
+      }
+      
       return {
         success: false,
-        error: `فشل النشر على سلة: ${response.status}`,
+        error: errorMessage,
       };
     }
 
@@ -192,11 +213,13 @@ export async function publishToSalla(
 
 /**
  * العملية الكاملة: تحليل الصور + توليد المحتوى + النشر على سلة
+ * @param userAccessToken توكن المستخدم المخصص للنشر (اختياري)
  */
 export async function processAndPublish(
   productNameInput: string,
   frontImageBase64?: string,
-  backImageBase64?: string
+  backImageBase64?: string,
+  userAccessToken?: string
 ): Promise<{
   success: boolean;
   productData?: ProductGenerationResult;
@@ -221,8 +244,8 @@ export async function processAndPublish(
       };
     }
 
-    // 3. النشر على سلة
-    const publishResult = await publishToSalla(productData);
+    // 3. النشر على سلة مع توكن المستخدم إذا كان متاحاً
+    const publishResult = await publishToSalla(productData, userAccessToken);
     if (!publishResult.success) {
       return {
         success: false,
