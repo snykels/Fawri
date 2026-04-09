@@ -62,12 +62,12 @@ export async function getValidAccessToken(): Promise<string | null> {
       return newTokens.access_token;
     }
 
-    // إذا فشل التحديث، نحاول استخدام التوكن القديم كملاذ أخير
-    console.log("[Salla OAuth] Refresh failed, trying existing token as fallback");
-    return currentToken.accessToken;
+    // إذا فشل التحديث، نرجع null للإشارة إلى ضرورة إعادة المصادقة
+    console.error("[Salla OAuth] Refresh failed, returning null");
+    return null;
     
   } catch (error) {
-    console.error("[Salla OAuth] Error getting valid token:", error);
+    console.error("[Salla OAuth] Error getting valid token or refreshing:", error);
     return null;
   }
 }
@@ -139,8 +139,9 @@ export async function exchangeCodeForTokens(code: string, merchantId?: string): 
     await saveTokens(data, merchantId);
     
     return data;
-  } catch (error) {
-    console.error("[Salla OAuth] Code exchange error:", error);
+  } catch (error: any) {
+    console.error("[Salla OAuth] Code exchange error:", error.message);
+    // يجب أن يتبع هذا فشل على الكلاينت side
     return null;
   }
 }
