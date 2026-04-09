@@ -1,4 +1,5 @@
 import { useLocation } from "wouter";
+import { useEffect } from "react";
 import { motion } from "framer-motion";
 import { useLanguage } from "@/lib/language-provider";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +11,26 @@ export default function LoginPage() {
   const [, setLocation] = useLocation();
   const { isEnglish, toggleLanguage } = useLanguage();
   const { theme } = useTheme();
+
+  // التحقق من حالة المصادقة عند تحميل الصفحة
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const response = await fetch('/api/user/check-auth');
+        const data = await response.json();
+        
+        if (data.isAuthenticated) {
+          // إذا كان المستخدم مسجل دخوله، توجيهه إلى لوحة التحكم
+          setLocation('/dashboard');
+        }
+      } catch (error) {
+        console.error('Auth check error:', error);
+        // في حالة الخطأ، نترك المستخدم في صفحة تسجيل الدخول
+      }
+    };
+
+    checkAuth();
+  }, [setLocation]);
 
   const handleSallaLogin = async () => {
     try {

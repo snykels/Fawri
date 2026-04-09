@@ -36,9 +36,9 @@ export default function SallaCallbackPage() {
           setStatus('success');
           setMessage(isEnglish ? 'Successfully connected to Salla!' : 'تم الاتصال بسلة بنجاح!');
           
-          // توجيه المستخدم إلى الصفحة الرئيسية بعد 2 ثانية
+          // توجيه المستخدم إلى لوحة التحكم بعد 2 ثانية
           setTimeout(() => {
-            setLocation('/');
+            setLocation('/dashboard');
           }, 2000);
         } else {
           setStatus('error');
