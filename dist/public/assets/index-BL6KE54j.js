@@ -11611,6 +11611,25 @@ var LogOut = createLucideIcon("LogOut", [
 	}]
 ]);
 //#endregion
+//#region node_modules/lucide-react/dist/esm/icons/mail.js
+/**
+* @license lucide-react v0.453.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Mail = createLucideIcon("Mail", [["rect", {
+	width: "20",
+	height: "16",
+	x: "2",
+	y: "4",
+	rx: "2",
+	key: "18n3k1"
+}], ["path", {
+	d: "m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7",
+	key: "1ocrg3"
+}]]);
+//#endregion
 //#region node_modules/lucide-react/dist/esm/icons/monitor.js
 /**
 * @license lucide-react v0.453.0 - ISC
@@ -32332,15 +32351,259 @@ function LoginPage() {
 								alt: "Salla Logo",
 								className: "w-6 h-6 object-contain"
 							}), isEnglish ? "Login with Salla" : "تسجيل مستخدم بواسطة سلة"]
-						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-							className: "mt-8",
-							children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Button, {
-								variant: "ghost",
-								onClick: () => setLocation("/admin/login"),
-								className: "text-muted-foreground hover:text-primary transition-colors text-xs font-bold",
-								children: isEnglish ? "Admin Access" : "دخول المشرفين"
-							})
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+							className: "mt-6 flex gap-4 justify-center",
+							children: [
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Button, {
+									variant: "ghost",
+									onClick: () => setLocation("/register"),
+									className: "text-muted-foreground hover:text-primary transition-colors text-sm font-bold",
+									children: isEnglish ? "Create Account" : "إنشاء حساب"
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+									className: "text-muted-foreground",
+									children: "|"
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Button, {
+									variant: "ghost",
+									onClick: () => setLocation("/admin/login"),
+									className: "text-muted-foreground hover:text-primary transition-colors text-xs font-bold",
+									children: isEnglish ? "Admin Access" : "دخول المشرفين"
+								})
+							]
 						})]
+					})]
+				})
+			})
+		]
+	});
+}
+//#endregion
+//#region client/src/pages/register.tsx
+function RegisterPage() {
+	const [, setLocation] = useLocation();
+	const { isEnglish, toggleLanguage } = useLanguage();
+	const { theme } = useTheme();
+	const [step, setStep] = (0, import_react.useState)("email");
+	const [email, setEmail] = (0, import_react.useState)("");
+	const [code, setCode] = (0, import_react.useState)("");
+	const [loading, setLoading] = (0, import_react.useState)(false);
+	const [error, setError] = (0, import_react.useState)("");
+	const [testCode, setTestCode] = (0, import_react.useState)("");
+	const sendVerification = async () => {
+		if (!email || !email.includes("@")) {
+			setError(isEnglish ? "Please enter a valid email" : "الرجاء إدخال بريد إلكتروني صحيح");
+			return;
+		}
+		setLoading(true);
+		setError("");
+		try {
+			const data = await (await fetch("/api/auth/send-verification", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ email })
+			})).json();
+			if (data.success) {
+				setStep("verify");
+				if (data.testCode) {
+					setTestCode(data.testCode);
+					console.log("Test code:", data.testCode);
+				}
+			} else setError(data.error || (isEnglish ? "Failed to send code" : "فشل في إرسال الرمز"));
+		} catch (err) {
+			setError(isEnglish ? "Connection error" : "خطأ في الاتصال");
+		} finally {
+			setLoading(false);
+		}
+	};
+	const verifyAndLogin = async () => {
+		if (!code || code.length !== 6) {
+			setError(isEnglish ? "Please enter 6-digit code" : "الرجاء إدخال رمز التحقق المكون من 6 أرقام");
+			return;
+		}
+		setLoading(true);
+		setError("");
+		try {
+			const data = await (await fetch("/api/auth/verify-and-login", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					email,
+					code
+				})
+			})).json();
+			if (data.success) setStep("salla");
+			else setError(data.error || (isEnglish ? "Invalid code" : "الرمز غير صحيح"));
+		} catch (err) {
+			setError(isEnglish ? "Connection error" : "خطأ في الاتصال");
+		} finally {
+			setLoading(false);
+		}
+	};
+	const handleSallaAuth = async () => {
+		const redirectUri = `${window.location.origin}/salla-callback`;
+		const data = await (await fetch(`/api/salla/auth-url?redirect_uri=${encodeURIComponent(redirectUri)}`)).json();
+		if (data.success && data.authUrl) window.location.href = data.authUrl;
+		else setError(isEnglish ? "Failed to connect to Salla" : "فشل في الاتصال بسلة");
+	};
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "relative flex min-h-screen items-center justify-center p-4 bg-background overflow-hidden font-sans",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ambient-glow" }),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "absolute top-6 right-6 z-50",
+				children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Button, {
+					variant: "ghost",
+					size: "sm",
+					onClick: toggleLanguage,
+					className: "glass gap-2 font-bold px-4 h-10 rounded-xl border border-primary/10 hover:bg-white/50 dark:hover:bg-card/50 transition-all",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Globe, { className: "w-4 h-4 text-primary" }), isEnglish ? "العربية" : "English"]
+				})
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
+				initial: {
+					opacity: 0,
+					y: 20
+				},
+				animate: {
+					opacity: 1,
+					y: 0
+				},
+				transition: { duration: .5 },
+				className: "w-full max-w-md z-10",
+				children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Card, {
+					className: "bg-white/70 dark:bg-card/40 border-border hover:border-primary/40 shadow-2xl overflow-hidden backdrop-blur-2xl rounded-3xl transition-all",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(CardHeader, {
+						className: "space-y-1 pb-6 pt-10 text-center border-b border-border/50",
+						children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+								className: "mx-auto w-40 mb-6 group cursor-pointer transition-transform hover:scale-105",
+								children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("img", {
+									src: theme === "dark" ? "/logo-dark.png" : "/logo_light.png",
+									alt: "Fawri Logo",
+									className: "w-full h-auto object-contain drop-shadow-xl"
+								})
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)(CardTitle, {
+								className: "text-3xl font-black tracking-tight text-foreground",
+								children: step === "email" ? isEnglish ? "Register" : "تسجيل جديد" : step === "verify" ? isEnglish ? "Verify Email" : "التحقق من الإيميل" : isEnglish ? "Connect to Salla" : "ربط سلة"
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+								className: "text-muted-foreground text-sm font-semibold opacity-80 pt-2 px-4",
+								children: step === "email" ? isEnglish ? "Enter your email to get started" : "أدخل بريدك الإلكتروني للبدء" : step === "verify" ? isEnglish ? `We sent a code to ${email}` : `أرسلنا رمز التحقق إلى ${email}` : isEnglish ? "Connect your Salla store" : "اربط متجرك في سلة"
+							})
+						]
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(CardContent, {
+						className: "pt-8 pb-10 px-8 flex flex-col items-center",
+						children: [
+							step === "email" && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								className: "w-full space-y-4",
+								children: [
+									/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+										className: "relative",
+										children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Mail, { className: "absolute right-3 top-3 w-5 h-5 text-muted-foreground" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Input, {
+											type: "email",
+											placeholder: isEnglish ? "Your email" : "بريدك الإلكتروني",
+											value: email,
+											onChange: (e) => setEmail(e.target.value),
+											className: "h-12 pr-10 rounded-xl"
+										})]
+									}),
+									error && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+										className: "text-red-500 text-sm",
+										children: error
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Button, {
+										onClick: sendVerification,
+										disabled: loading,
+										className: "w-full h-12 bg-primary hover:bg-primary/90 text-white shadow-xl rounded-2xl font-bold text-lg",
+										children: loading ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LoaderCircle, { className: "animate-spin" }) : isEnglish ? "Send Code" : "إرسال الرمز"
+									})
+								]
+							}),
+							step === "verify" && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								className: "w-full space-y-4",
+								children: [
+									testCode && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+										className: "bg-yellow-100 dark:bg-yellow-900 p-3 rounded-lg text-center mb-2",
+										children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+											className: "text-sm text-yellow-800 dark:text-yellow-200",
+											children: [
+												isEnglish ? "Test Code:" : "رمز الاختبار:",
+												" ",
+												/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: testCode })
+											]
+										})
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+										className: "relative",
+										children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Input, {
+											type: "text",
+											placeholder: isEnglish ? "6-digit code" : "رمز التحقق (6 أرقام)",
+											value: code,
+											onChange: (e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6)),
+											className: "h-12 text-center text-2xl letter-spacing-4 rounded-xl",
+											maxLength: 6
+										})
+									}),
+									error && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+										className: "text-red-500 text-sm",
+										children: error
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Button, {
+										onClick: verifyAndLogin,
+										disabled: loading || code.length !== 6,
+										className: "w-full h-12 bg-primary hover:bg-primary/90 text-white shadow-xl rounded-2xl font-bold text-lg",
+										children: loading ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LoaderCircle, { className: "animate-spin" }) : isEnglish ? "Verify & Continue" : "تحقق والمتابعة"
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Button, {
+										variant: "link",
+										onClick: () => {
+											setStep("email");
+											setError("");
+										},
+										className: "w-full",
+										children: isEnglish ? "Change email" : "تغيير الإيميل"
+									})
+								]
+							}),
+							step === "salla" && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								className: "w-full space-y-4",
+								children: [
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+										className: "bg-green-100 dark:bg-green-900 p-4 rounded-lg text-center mb-4",
+										children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+											className: "text-green-700 dark:text-green-300 font-bold",
+											children: ["✓ ", isEnglish ? "Email verified!" : "تم التحقق من الإيميل!"]
+										})
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Button, {
+										onClick: handleSallaAuth,
+										className: "w-full h-14 bg-[#00b289] hover:bg-[#008f6e] text-white shadow-xl shadow-[#00b289]/20 hover:scale-[1.02] active:scale-[0.98] transition-all rounded-2xl flex items-center justify-center gap-3 font-bold text-lg",
+										children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("img", {
+											src: "https://salla.network/cdn/images/salla-logo-white.svg",
+											alt: "Salla Logo",
+											className: "w-6 h-6 object-contain"
+										}), isEnglish ? "Connect Salla Store" : "ربط متجر سلة"]
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Button, {
+										variant: "link",
+										onClick: () => setLocation("/dashboard"),
+										className: "w-full",
+										children: isEnglish ? "Skip for now" : "تخطي في الوقت الحالي"
+									})
+								]
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+								className: "mt-8",
+								children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Button, {
+									variant: "ghost",
+									onClick: () => setLocation("/login"),
+									className: "text-muted-foreground hover:text-primary transition-colors text-xs font-bold",
+									children: isEnglish ? "Already have an account? Login" : "لديك حساب؟ تسجيل دخول"
+								})
+							})
+						]
 					})]
 				})
 			})
@@ -32898,6 +33161,14 @@ function Router() {
 		/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Route, {
 			path: "/login",
 			component: LoginPage
+		}),
+		/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Route, {
+			path: "/register",
+			component: RegisterPage
+		}),
+		/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Route, {
+			path: "/salla-callback",
+			component: SallaCallbackPage
 		}),
 		/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Route, {
 			path: "/salla/callback",

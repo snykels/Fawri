@@ -95,14 +95,21 @@ export default function LoginPage() {
                 {isEnglish ? "Login with Salla" : "تسجيل مستخدم بواسطة سلة"}
             </Button>
             
-            {/* Admin Link at the bottom */}
-            <div className="mt-8">
+            <div className="mt-6 flex gap-4 justify-center">
                 <Button 
-                  variant="ghost" 
-                  onClick={() => setLocation("/admin/login")} 
-                  className="text-muted-foreground hover:text-primary transition-colors text-xs font-bold"
+                    variant="ghost" 
+                    onClick={() => setLocation("/register")} 
+                    className="text-muted-foreground hover:text-primary transition-colors text-sm font-bold"
                 >
-                  {isEnglish ? "Admin Access" : "دخول المشرفين"}
+                    {isEnglish ? "Create Account" : "إنشاء حساب"}
+                </Button>
+                <span className="text-muted-foreground">|</span>
+                <Button 
+                    variant="ghost" 
+                    onClick={() => setLocation("/admin/login")} 
+                    className="text-muted-foreground hover:text-primary transition-colors text-xs font-bold"
+                >
+                    {isEnglish ? "Admin Access" : "دخول المشرفين"}
                 </Button>
             </div>
 

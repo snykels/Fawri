@@ -76,6 +76,39 @@ sqliteInit.exec(`
     expires_at INTEGER NOT NULL,
     created_at INTEGER NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT NOT NULL UNIQUE,
+    name TEXT,
+    salla_merchant_id TEXT,
+    salla_access_token TEXT,
+    salla_refresh_token TEXT,
+    salla_token_expires_at INTEGER,
+    is_active INTEGER DEFAULT 1 NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS salla_categories (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    salla_category_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    name_en TEXT,
+    parent_id TEXT,
+    merchant_id TEXT,
+    product_count INTEGER DEFAULT 0,
+    last_synced_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS email_verification (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT NOT NULL,
+    code TEXT NOT NULL,
+    expires_at INTEGER NOT NULL,
+    verified INTEGER DEFAULT 0,
+    created_at INTEGER NOT NULL
+  );
 `);
 console.log("Database initialized successfully.");
 sqliteInit.close();

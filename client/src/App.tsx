@@ -9,6 +9,7 @@ import Home from "@/pages/home";
 import AdminPage from "@/pages/admin";
 import PublishPage from "@/pages/publish";
 import LoginPage from "@/pages/login";
+import RegisterPage from "@/pages/register";
 import AdminLoginPage from "@/pages/admin-login";
 import SallaCallbackPage from "@/pages/salla-callback";
 import DashboardPage from "@/pages/dashboard";
@@ -19,6 +20,8 @@ function Router() {
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/login" component={LoginPage} />
+      <Route path="/register" component={RegisterPage} />
+      <Route path="/salla-callback" component={SallaCallbackPage} />
       <Route path="/salla/callback" component={SallaCallbackPage} />
       <Route path="/dashboard" component={DashboardPage} />
       <Route path="/admin/login" component={AdminLoginPage} />

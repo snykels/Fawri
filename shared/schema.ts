@@ -138,6 +138,19 @@ export const sallaCategories = sqliteTable("salla_categories", {
 export const insertSallaCategorySchema = createInsertSchema(sallaCategories);
 export type SallaCategory = typeof sallaCategories.$inferSelect;
 
+// جدول التحقق منOTP
+export const emailVerification = sqliteTable("email_verification", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  email: text("email").notNull(),
+  code: text("code").notNull(),
+  expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
+  verified: integer("verified", { mode: "boolean" }).default(false),
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()).notNull(),
+});
+
+export const insertEmailVerificationSchema = createInsertSchema(emailVerification);
+export type EmailVerification = typeof emailVerification.$inferSelect;
+
 // جدول المستخدمين/العملاء
 export const users = sqliteTable("users", {
   id: integer("id").primaryKey({ autoIncrement: true }),

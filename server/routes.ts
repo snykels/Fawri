@@ -8,7 +8,7 @@ import fs from "fs";
 import { productDataSchema, type ProductData } from "@shared/schema";
 import { image_search } from "duckduckgo-images-api";
 import { db } from "./db";
-import { uploadedProducts, sallaTokens, sallaWebhookEvents, users, sallaCategories } from "@shared/schema";
+import { uploadedProducts, sallaTokens, sallaWebhookEvents, users, sallaCategories, emailVerification } from "@shared/schema";
 import { eq, desc } from "drizzle-orm";
 import session from "express-session";
 import createMemoryStore from "memorystore";
@@ -2491,6 +2491,155 @@ export async function registerRoutes(
         success: false,
         error: error.message || "حدث خطأ",
       });
+    }
+  });
+
+  // ============================================
+  // Email Verification Routes
+  // ============================================
+
+  // طلب إرسال رمز التحقق
+  app.post("/api/auth/send-verification", async (req, res) => {
+    try {
+      const { email } = req.body;
+      
+      if (!email || !email.includes('@')) {
+        return res.status(400).json({ success: false, error: "بريد إلكتروني صحيح مطلوب" });
+      }
+
+      // إنشاء رمز تحقق عشوائي (6 أرقام)
+      const code = Math.floor(100000 + Math.random() * 900000).toString();
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // صالح 10 دقائق
+
+      // حذف أي أكواد قديمة لهذا البريد
+      await db.delete(emailVerification).where(eq(emailVerification.email, email));
+
+      // حفظ الرمز الجديد
+      await db.insert(emailVerification).values({
+        email: email,
+        code: code,
+        expiresAt: expiresAt,
+        verified: false,
+      });
+
+      // إرسال الإيميل (محاكاة في الوقت الحالي - يجب إضافة SMTP حقيقية)
+      console.log(`[Email Verification] Code for ${email}: ${code}`);
+      
+      // في الإنتاج، هنا يتم إرسال الإيميل الفعلي
+      // await sendEmail(email, "رمز التحقق من فوري", `رمز التحقق: ${code}`);
+
+      return res.json({
+        success: true,
+        message: "تم إرسال رمز التحقق إلى بريدك الإلكتروني",
+        // للتختبر فقط:
+        testCode: code
+      });
+    } catch (error: any) {
+      console.error("[Send Verification] Error:", error);
+      return res.status(500).json({ success: false, error: "فشل في إرسال رمز التحقق" });
+    }
+  });
+
+  // التحقق من الرمز وتسجيل الدخول
+  app.post("/api/auth/verify-and-login", async (req, res) => {
+    try {
+      const { email, code, sallaToken, merchantId, merchantName } = req.body;
+      
+      if (!email || !code) {
+        return res.status(400).json({ success: false, error: "البريد الإلكتروني والرمز مطلوبان" });
+      }
+
+      // البحث عن الرمز
+      const verification = await db.select()
+        .from(emailVerification)
+        .where(eq(emailVerification.email, email))
+        .where(eq(emailVerification.code, code))
+        .limit(1);
+
+      if (verification.length === 0) {
+        return res.status(400).json({ success: false, error: "رمز التحقق غير صحيح" });
+      }
+
+      const validCode = verification[0];
+      
+      // التحقق من expiry
+      if (new Date() > new Date(validCode.expiresAt)) {
+        return res.status(400).json({ success: false, error: "انتهت صلاحية رمز التحقق" });
+      }
+
+      // تحديث حالة التحقق
+      await db.update(emailVerification)
+        .set({ verified: true })
+        .where(eq(emailVerification.id, validCode.id));
+
+      // البحث عن المستخدم أو إنشاؤه
+      let userId: number;
+      let existingUser = await db.select().from(users).where(eq(users.email, email)).limit(1);
+
+      if (existingUser.length === 0) {
+        // إنشاء مستخدم جديد
+        const inserted = await db.insert(users).values({
+          email: email,
+          name: merchantName || "تاجر جديد",
+          sallaMerchantId: merchantId || null,
+          sallaAccessToken: sallaToken || null,
+          sallaRefreshToken: null,
+          sallaTokenExpiresAt: sallaToken ? new Date(Date.now() + 3600 * 1000) : null,
+        }).returning({ id: users.id });
+        userId = inserted[0].id;
+      } else {
+        // تحديث المستخدم الموجود
+        userId = existingUser[0].id;
+        await db.update(users)
+          .set({
+            sallaMerchantId: merchantId || existingUser[0].sallaMerchantId,
+            sallaAccessToken: sallaToken || existingUser[0].sallaAccessToken,
+            sallaTokenExpiresAt: sallaToken ? new Date(Date.now() + 3600 * 1000) : existingUser[0].sallaTokenExpiresAt,
+            updatedAt: new Date(),
+          })
+          .where(eq(users.id, userId));
+      }
+
+      // تعيين جلسة المستخدم
+      req.session.userId = userId;
+
+      return res.json({
+        success: true,
+        message: "تم التحقق وتسجيل الدخول بنجاح",
+        userId: userId,
+      });
+    } catch (error: any) {
+      console.error("[Verify and Login] Error:", error);
+      return res.status(500).json({ success: false, error: "فشل في التحقق" });
+    }
+  });
+
+  // تسجيل دخول مباشر (إذا كان لديه جلسة سابقة)
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const { email, password } = req.body;
+      
+      if (!email || !password) {
+        return res.status(400).json({ success: false, error: "البريد الإلكتروني وكلمة المرور مطلوبان" });
+      }
+
+      const user = await db.select().from(users).where(eq(users.email, email)).limit(1);
+      
+      if (user.length === 0) {
+        return res.status(401).json({ success: false, error: "المستخدم غير موجود" });
+      }
+
+      // تعيين جلسة
+      req.session.userId = user[0].id;
+
+      return res.json({
+        success: true,
+        message: "تم تسجيل الدخول بنجاح",
+        userId: user[0].id,
+      });
+    } catch (error: any) {
+      console.error("[Login] Error:", error);
+      return res.status(500).json({ success: false, error: "فشل في تسجيل الدخول" });
     }
   });
 
