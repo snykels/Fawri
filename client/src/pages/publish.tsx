@@ -3,7 +3,8 @@
  * تتيح للمستخدم نشر المنتجات مباشرة دون الحاجة لرفع صورتين
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -22,12 +23,32 @@ interface PublishResult {
 }
 
 export default function PublishPage() {
+  const [, setLocation] = useLocation();
   const [productName, setProductName] = useState("");
   const [frontImage, setFrontImage] = useState<string | null>(null);
   const [backImage, setBackImage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<PublishResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const authResponse = await fetch('/api/user/check-auth');
+        const authData = await authResponse.json();
+        
+        if (!authData.isAuthenticated) {
+          setLocation('/login');
+          return;
+        }
+      } catch (error) {
+        console.error('Auth check failed:', error);
+        setLocation('/login');
+      }
+    };
+    
+    checkAuth();
+  }, [setLocation]);
 
   const handleImageUpload = (
     e: React.ChangeEvent<HTMLInputElement>,
