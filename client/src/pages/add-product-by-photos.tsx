@@ -97,6 +97,14 @@ export default function AddProductByPhotosPage() {
       } else {
         setResponseData(data);
         setSuccess(true);
+        // اعادة توجيه للمستخدم بعد ثوانٍ إلى لوحة التحكم كحالة نجاح عملية
+        setTimeout(() => {
+          try {
+            window.location.href = '/dashboard';
+          } catch {
+            // في حال فشل التوجيه نترك الصفحة كما هي
+          }
+        }, 2000);
       }
     } catch (err) {
       setError(isEnglish ? "Network error" : "خطأ في الشبكة");

@@ -351,20 +351,25 @@ export async function registerRoutes(
               }),
             });
 
-            if (refreshResponse.ok) {
-              const refreshData = await refreshResponse.json();
+              if (refreshResponse.ok) {
+                const refreshData = await refreshResponse.json();
+                
+                // تحديث التوكنات في قاعدة البيانات
+                await db.update(users)
+                  .set({
+                    sallaAccessToken: refreshData.access_token,
+                    sallaRefreshToken: refreshData.refresh_token,
+                    sallaTokenExpiresAt: new Date(Date.now() + refreshData.expires_in * 1000),
+                    updatedAt: new Date(),
+                  })
+                  .where(eq(users.id, userId));
               
-              // تحديث التوكنات في قاعدة البيانات
-              await db.update(users)
-                .set({
-                  sallaAccessToken: refreshData.access_token,
-                  sallaRefreshToken: refreshData.refresh_token,
-                  sallaTokenExpiresAt: new Date(Date.now() + refreshData.expires_in * 1000),
-                  updatedAt: new Date(),
-                })
-                .where(eq(users.id, userId));
-              
-              console.log(`[Auth] Token refreshed successfully for user ${user[0].email}`);
+              // إعادة تحميل بيانات المستخدم وتحديث الطلب
+              const updatedUser = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+              if (updatedUser.length > 0) {
+                req.user = updatedUser[0];
+              }
+                console.log(`[Auth] Token refreshed successfully for user ${user[0].email}`);
             } else {
               // فشل التحديث - حذف الجلسة
               console.error(`[Auth] Failed to refresh token for user ${user[0].email}`);
