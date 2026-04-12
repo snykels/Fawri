@@ -580,15 +580,24 @@ export async function registerRoutes(
           console.log(`[OAuth Callback] User updated: ${merchantEmail}, id: ${userId}`);
         }
 
-        // تعيين جلسة للمستخدم
+        // تعيين جلسة للمستخدم كمشرف لأنه صاحب المتجر
         req.session.userId = userId;
+        req.session.isAdmin = true;
         
+        // التحقق من نوع الطلب
+        if (req.headers.accept && req.headers.accept.includes("application/json")) {
+           return res.json({ success: true, userId });
+        }
+
         // إعادة التوجيه إلى صفحة النجاح في الواجهة الأمامية
-        const frontendUrl = process.env.VITE_API_BASE_URL || "https://upload.fawri.cloud";
+        const frontendUrl = process.env.VITE_API_BASE_URL || "";
         return res.redirect(`${frontendUrl}/salla-callback?success=true&userId=${userId}`);
       } else {
+        if (req.headers.accept && req.headers.accept.includes("application/json")) {
+           return res.status(400).json({ success: false, message: "Failed to exchange authorization code" });
+        }
         // إعادة التوجيه إلى صفحة الخطأ
-        const frontendUrl = process.env.VITE_API_BASE_URL || "https://upload.fawri.cloud";
+        const frontendUrl = process.env.VITE_API_BASE_URL || "";
         return res.redirect(`${frontendUrl}/salla-callback?error=Failed to exchange authorization code`);
       }
     } catch (err: any) {
@@ -598,10 +607,13 @@ export async function registerRoutes(
   });
 
   // --- SALLA AUTHORIZATION URL ROUTE ---
-  app.get("/api/salla/auth-url", requireAdmin, async (req, res) => {
+  app.get("/api/salla/auth-url", async (req, res) => {
     try {
       const { getAuthorizationUrl } = await import("./salla-oauth");
-      const redirectUri = req.query.redirect_uri as string || `https://upload.fawri.cloud/api/salla/callback`;
+      const host = req.get('host');
+      const protocol = req.protocol;
+      const defaultRedirectUri = process.env.SALLA_REDIRECT_URI || `${protocol}://${host}/api/salla/callback`;
+      const redirectUri = req.query.redirect_uri as string || defaultRedirectUri;
       const authUrl = getAuthorizationUrl(redirectUri);
       
       res.json({ 

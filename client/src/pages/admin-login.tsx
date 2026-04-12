@@ -4,40 +4,31 @@ import { motion } from "framer-motion";
 import { useLanguage } from "@/lib/language-provider";
 import { useTheme } from "@/lib/theme-provider";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Globe, Search, ShieldCheck } from "lucide-react";
+import { Globe, Store, Loader2 } from "lucide-react";
 
 export default function AdminLoginPage() {
   const [, setLocation] = useLocation();
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const { isEnglish, toggleLanguage } = useLanguage();
   const { theme } = useTheme();
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSallaLogin = async () => {
+    setIsLoading(true);
     try {
-      const res = await fetch("/api/admin/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password })
-      });
+      const res = await fetch("/api/salla/auth-url");
       const data = await res.json();
-      if (data.success) {
-        toast({ 
-          title: isEnglish ? "Logged in successfully" : "تم الدخول بنجاح", 
-          description: isEnglish ? "Welcome back, Admin." : "مرحباً بك مجدداً، أيها المشرف." 
-        });
-        setLocation("/admin"); // Redirect to the dashboard
+      if (data.success && data.authUrl) {
+         window.location.href = data.authUrl;
       } else {
         toast({ 
           title: isEnglish ? "Login failed" : "فشل الدخول", 
-          description: data.message, 
+          description: data.message || "Could not reach Salla OAuth", 
           variant: "destructive" 
         });
+        setIsLoading(false);
       }
     } catch {
       toast({ 
@@ -45,6 +36,7 @@ export default function AdminLoginPage() {
         description: isEnglish ? "Login request failed" : "فشل طلب تسجيل الدخول", 
         variant: "destructive" 
       });
+      setIsLoading(false);
     }
   };
 
@@ -75,41 +67,22 @@ export default function AdminLoginPage() {
                 className="w-full h-auto object-contain drop-shadow-xl" 
               />
             </div>
-            <CardTitle className="text-2xl font-black tracking-tight uppercase italic text-primary">
-              {isEnglish ? "Admin Console" : "لوحة المشرف"}
+            <CardTitle className="text-2xl font-black tracking-tight text-primary">
+              {isEnglish ? "Store Control Panel" : "لوحة تحكم المتجر"}
             </CardTitle>
             <p className="text-muted-foreground text-xs uppercase tracking-widest font-bold opacity-70">
-              {isEnglish ? "Secure Access Only" : "دخول آمن فقط"}
+              {isEnglish ? "Login via Salla Platform" : "الدخول عبر منصة سلة"}
             </p>
           </CardHeader>
-          <CardContent className="pt-8 px-8 pb-10 space-y-4">
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div className="space-y-2">
-                <div className="relative group">
-                  <Input 
-                    type="text" 
-                    placeholder={isEnglish ? "Username" : "اسم المستخدم"} 
-                    className="bg-white/50 dark:bg-background/40 border-primary/10 focus-visible:ring-primary pl-10 pr-10 h-12 transition-all hover:bg-white dark:hover:bg-background/60 rounded-xl font-medium"
-                    value={username} onChange={e => setUsername(e.target.value)} 
-                  />
-                  <Search className={`absolute ${isEnglish ? 'left-3' : 'right-3'} top-3.5 w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors`} />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <div className="relative group">
-                  <Input 
-                    type="password" 
-                    placeholder={isEnglish ? "Password" : "كلمة المرور"} 
-                    className="bg-white/50 dark:bg-background/40 border-primary/10 focus-visible:ring-primary pl-10 pr-10 h-12 transition-all hover:bg-white dark:hover:bg-background/60 rounded-xl font-medium"
-                    value={password} onChange={e => setPassword(e.target.value)} 
-                  />
-                  <ShieldCheck className={`absolute ${isEnglish ? 'left-3' : 'right-3'} top-3.5 w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors`} />
-                </div>
-              </div>
-              <Button type="submit" size="lg" className="w-full bolt-button font-bold text-lg h-12 shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all rounded-xl mt-4">
-                {isEnglish ? "Authorize Entry" : "دخول اللوحة"}
-              </Button>
-            </form>
+          <CardContent className="pt-8 px-8 pb-10 space-y-4 text-center">
+             <Store className="w-16 h-16 text-primary/50 mx-auto mb-4" />
+             <p className="text-sm font-bold text-muted-foreground mb-4">
+                {isEnglish ? "To analyze and upload your products, please authenticate using your Salla Merchant account." : "لتحليل ورفع منتجاتك، يرجى تسجيل الدخول باستخدام حساب كتاجر في منصة سلة."}
+             </p>
+            <Button onClick={handleSallaLogin} size="lg" disabled={isLoading} className="w-full bolt-button font-bold text-lg h-14 shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all rounded-xl mt-4">
+              {isLoading ? <Loader2 className="animate-spin w-6 h-6 mr-2" /> : <Store className="w-6 h-6 mr-2" />}
+              {isEnglish ? "Login with Salla" : "تسجيل الدخول عبر سلة"}
+            </Button>
           </CardContent>
         </Card>
       </motion.div>

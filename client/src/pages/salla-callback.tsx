@@ -17,10 +17,20 @@ export default function SallaCallbackPage() {
   useEffect(() => {
     const handleCallback = async () => {
       try {
-        // استخراج الكود والـ state من URL
         const urlParams = new URLSearchParams(window.location.search);
+        const success = urlParams.get('success');
         const code = urlParams.get('code');
         const state = urlParams.get('state');
+
+        // If the backend already processed the code and redirected here with success=true
+        if (success === 'true') {
+          setStatus('success');
+          setMessage(isEnglish ? 'Successfully connected to Salla!' : 'تم الاتصال بسلة بنجاح!');
+          setTimeout(() => {
+            setLocation('/admin');
+          }, 2000);
+          return;
+        }
 
         if (!code) {
           setStatus('error');
@@ -29,7 +39,11 @@ export default function SallaCallbackPage() {
         }
 
         // إرسال الكود إلى الخادم لتبادل التوكنات
-        const response = await fetch(`/api/salla/callback?code=${code}${state ? `&state=${state}` : ''}`);
+        const response = await fetch(`/api/salla/callback?code=${code}${state ? `&state=${state}` : ''}`, {
+          headers: {
+            "Accept": "application/json"
+          }
+        });
         const data = await response.json();
 
         if (data.success) {
@@ -38,7 +52,7 @@ export default function SallaCallbackPage() {
           
           // توجيه المستخدم إلى لوحة التحكم بعد 2 ثانية
           setTimeout(() => {
-            setLocation('/dashboard');
+            setLocation('/admin');
           }, 2000);
         } else {
           setStatus('error');
