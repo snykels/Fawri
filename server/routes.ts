@@ -2068,7 +2068,7 @@ export async function registerRoutes(
    * يجب تسجيل هذا الرابط في لوحة تحكم سلة كـ Webhook URL
    * الرابط: https://yourdomain.com/api/salla/webhook
    */
-  app.post("/api/salla/webhook", async (req, res) => {
+  app.post(["/api/salla/webhook", "/api/salla/callback"], async (req, res) => {
     try {
       // التحقق من صحة الطلب (اختياري ولكن مُنصح به)
       const webhookSecret = process.env.SALLA_WEBHOOK_SECRET;
